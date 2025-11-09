@@ -230,7 +230,3 @@ Unauthorized use, reproduction, or redistribution of this software — in full o
 
 > 🧠 *"Hack. Learn. Grow. — Project-X is where cybersecurity meets creativity."*
 
----
-
-Would you like me to tailor this for your actual **backend framework** (e.g., `FastAPI` + `Next.js`) or keep it as the **Node.js full-stack (Next.js API Routes)** version you’re using right now?
-```
