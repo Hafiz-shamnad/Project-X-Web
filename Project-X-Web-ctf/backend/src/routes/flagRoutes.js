@@ -1,4 +1,3 @@
-// src/routes/flagRoutes.js
 const express = require('express');
 const { submitFlag } = require('../controllers/flagController');
 const router = express.Router();

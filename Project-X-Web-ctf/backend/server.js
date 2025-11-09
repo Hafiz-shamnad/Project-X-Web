@@ -1,15 +1,23 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const { initDB } = require('./src/config/db');
 
 const challengeRoutes = require('./src/routes/challengeRoutes');
 const leaderboardRoutes = require('./src/routes/leaderboardRoutes');
 const userRoutes = require('./src/routes/userRoutes');
 const flagRoutes = require('./src/routes/flagRoutes');
+const authRoutes = require('./src/routes/authRoutes');
+const adminRoutes = require('./src/routes/adminRoutes');
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+app.use(cookieParser());
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true,
+}));
+
 
 // Initialize database
 initDB();
@@ -19,6 +27,8 @@ app.use('/api/challenges', challengeRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/flag', flagRoutes); 
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health endpoint
 app.get('/api/health', (req, res) => {

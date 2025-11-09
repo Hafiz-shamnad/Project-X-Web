@@ -1,27 +1,114 @@
-import User from '../models/User.js';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const { prisma } = require('../config/db');
 
-export const register = async (req, res) => {
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+const JWT_EXPIRES_IN = '7d';
+const BCRYPT_ROUNDS = 12;
+
+function generateToken(user) {
+  return jwt.sign(
+    { userId: user.id, username: user.username, role: user.role },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+}
+
+const cookieOptions = {
+  httpOnly: true, // 🚫 cannot be accessed by JS
+  secure: process.env.NODE_ENV === 'production', // only HTTPS in prod
+  sameSite: 'lax', // protect against CSRF
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+};
+
+// 🧩 Register
+exports.register = async (req, res) => {
   try {
-    const { username, email, password } = req.body;
-    const user = await User.create({ username, email, password });
-    res.json({ message: 'User registered successfully', user });
+    const { username, password, email } = req.body;
+
+    if (!username || !password)
+      return res.status(400).json({ error: 'Username and password required' });
+
+    const existing = await prisma.user.findUnique({ where: { username } });
+    if (existing) return res.status(409).json({ error: 'Username already exists' });
+
+    const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    const user = await prisma.user.create({
+      data: { username, passwordHash: hash, email },
+    });
+
+    const token = generateToken(user);
+    res.cookie('token', token, cookieOptions); // 🍪 Set cookie
+
+    return res.json({
+      message: 'Registration successful',
+      user: { id: user.id, username: user.username, role: user.role },
+    });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('Register Error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
-export const login = async (req, res) => {
+// 🔐 Login
+exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ message: 'Invalid email' });
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: 'Invalid password' });
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-    res.json({ token, user });
+    const { username, password } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { username } });
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) return res.status(401).json({ error: 'Invalid credentials' });
+
+    const token = generateToken(user);
+    res.cookie('token', token, cookieOptions); // 🍪 Set cookie
+
+    return res.json({
+      message: 'Login successful',
+      user: { id: user.id, username: user.username, role: user.role },
+    });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('Login Error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// in src/controllers/authController.js
+exports.logout = (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
+  res.json({ message: 'Logged out successfully' });
+};
+
+
+// 👤 Get Current User (/api/auth/me)
+exports.me = async (req, res) => {
+  try {
+    const token = req.cookies?.token;
+    if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    res.json({ user });
+  } catch (err) {
+    console.error('Me Error:', err);
+    res.status(401).json({ error: 'Invalid or expired token' });
   }
 };
