@@ -223,14 +223,12 @@ Unauthorized use, reproduction, or redistribution of this software — in full o
 ## 💬 Contact
 
 **Author:** Hafiz Shamnad
-**LinkedIn:** [linkedin.com/in/hafizshamnad](https://linkedin.com/in/hafizshamnad)
-**Email:** `hafiz@projectx.dev` *(placeholder)*
-**Discord:** `@hafizshamnad`
+
+**LinkedIn:** [linkedin.com/in/hafiz-shamnad](https://linkedin.com/in/hafiz-shamnad)
 
 ---
 
 > 🧠 *"Hack. Learn. Grow. — Project-X is where cybersecurity meets creativity."*
-
 
 ---
 
