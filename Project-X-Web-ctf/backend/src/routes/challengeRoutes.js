@@ -1,6 +1,7 @@
-import express from 'express';
-import { getChallenges, submitFlag } from '../controllers/challengeController.js';
+const express = require('express');
+const { getChallenges } = require('../controllers/challengeController');
 const router = express.Router();
+
 router.get('/', getChallenges);
-router.post('/submit', submitFlag);
-export default router;
+
+module.exports = router;
