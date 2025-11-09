@@ -5,6 +5,7 @@ const { initDB } = require('./src/config/db');
 const challengeRoutes = require('./src/routes/challengeRoutes');
 const leaderboardRoutes = require('./src/routes/leaderboardRoutes');
 const userRoutes = require('./src/routes/userRoutes');
+const flagRoutes = require('./src/routes/flagRoutes');
 
 const app = express();
 app.use(express.json());
@@ -17,6 +18,7 @@ initDB();
 app.use('/api/challenges', challengeRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/flag', flagRoutes); 
 
 // Health endpoint
 app.get('/api/health', (req, res) => {

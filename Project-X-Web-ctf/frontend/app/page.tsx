@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Terminal, Lock, Unlock, Flag, Trophy, Users, Target, Shield, Code, Zap } from 'lucide-react';
+import FlagModal from './components/FlagModal';
 
 export default function ProjectXCTF() {
   const [activeTab, setActiveTab] = useState<'challenges' | 'leaderboard'>('challenges');
@@ -10,6 +11,8 @@ export default function ProjectXCTF() {
   const [solvedChallenges, setSolvedChallenges] = useState<number[]>([]);
   const [username, setUsername] = useState('H4ck3rPr0');
   const [loading, setLoading] = useState(true);
+  const [flagModalOpen, setFlagModalOpen] = useState(false);
+  const [activeChallenge, setActiveChallenge] = useState<number | null>(null);
 
   const backendURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -29,7 +32,7 @@ export default function ProjectXCTF() {
 
         setChallenges(challengeData);
         setLeaderboard(leaderboardData);
-        setSolvedChallenges(userData.solved.map((s: any) => s.challengeId || s)); // works with Prisma schema
+        setSolvedChallenges(userData.solved.map((s: any) => s.challengeId || s));
       } catch (err) {
         console.error('❌ Error fetching data:', err);
       } finally {
@@ -50,25 +53,6 @@ export default function ProjectXCTF() {
         return 'text-red-500';
       default:
         return 'text-gray-500';
-    }
-  };
-
-  const toggleSolve = async (id: number) => {
-    try {
-      const res = await fetch(`${backendURL}/user/solve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, challengeId: id })
-      });
-      const data = await res.json();
-
-      if (data.status === 'solved') {
-        setSolvedChallenges((prev) => [...prev, id]);
-      } else if (data.status === 'unsolved') {
-        setSolvedChallenges((prev) => prev.filter((cId) => cId !== id));
-      }
-    } catch (err) {
-      console.error('Error toggling challenge:', err);
     }
   };
 
@@ -196,7 +180,10 @@ export default function ProjectXCTF() {
                     <span className="font-bold">{challenge.points} pts</span>
                   </div>
                   <button
-                    onClick={() => toggleSolve(challenge.id)}
+                    onClick={() => {
+                      setActiveChallenge(challenge.id);
+                      setFlagModalOpen(true);
+                    }}
                     className={`px-4 py-2 rounded font-bold transition-colors ${
                       solvedChallenges.includes(challenge.id)
                         ? 'bg-green-500 text-black hover:bg-green-400'
@@ -257,6 +244,27 @@ export default function ProjectXCTF() {
           </div>
         )}
       </div>
+
+      {/* FLAG MODAL */}
+      <FlagModal
+        open={flagModalOpen}
+        onClose={() => {
+          setFlagModalOpen(false);
+          setActiveChallenge(null);
+        }}
+        onSuccess={(data) => {
+          if (data.status === 'correct' && activeChallenge) {
+            setSolvedChallenges((prev) => [...prev, activeChallenge]);
+            fetch(`${backendURL}/leaderboard`)
+              .then((r) => r.json())
+              .then(setLeaderboard)
+              .catch(() => {});
+          }
+        }}
+        username={username}
+        challengeId={activeChallenge}
+        backendUrl={backendURL}
+      />
 
       {/* FOOTER */}
       <footer className="border-t border-green-500 mt-16 py-8">
