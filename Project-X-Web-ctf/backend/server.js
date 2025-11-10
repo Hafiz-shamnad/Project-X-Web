@@ -33,6 +33,32 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+const fs = require('fs');
+
+// ✅ Secure file download route (authenticated)
+app.get('/api/download/:filename', async (req, res) => {
+  try {
+    const fileName = req.params.filename;
+
+    // prevent path traversal
+    if (!/^[a-zA-Z0-9._-]+$/.test(fileName)) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+
+    const filePath = path.join(__dirname, 'uploads', fileName);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // send file for download
+    res.download(filePath, fileName);
+  } catch (err) {
+    console.error('❌ File download error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
 // Health endpoint
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });

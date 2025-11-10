@@ -3,9 +3,8 @@ import React, { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { Shield, Trash2, Plus } from "lucide-react";
 
-
 export default function AdminPanel() {
-    const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [challenges, setChallenges] = useState<any[]>([]);
   const [form, setForm] = useState({
     name: "",
@@ -84,8 +83,15 @@ export default function AdminPanel() {
   };
 
   const deleteChallenge = async (id: number) => {
-    await apiFetch(`/admin/challenges/${id}`, { method: "DELETE" });
-    fetchChallenges();
+    try {
+      const res = await apiFetch(`/admin/challenge/${id}`, {
+        method: "DELETE",
+      });
+      console.log("✅ Deleted challenge:", res);
+      await fetchChallenges();
+    } catch (err) {
+      console.error("❌ Delete failed:", err);
+    }
   };
 
   return (
