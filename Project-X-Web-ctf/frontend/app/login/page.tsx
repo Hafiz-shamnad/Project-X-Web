@@ -9,22 +9,30 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
     try {
       const res = await apiFetch('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ username, password }),
       });
 
-      if (res.error) setError(res.error);
-      else router.push('/dashboard');
+      if (res.error) {
+        setError(res.error);
+      } else {
+        // ✅ Expect backend returns: { message, user: { username, role }, token }
+        if (res.user?.role === 'admin') {
+          router.push('/admin');
+        } else {
+          router.push('/dashboard');
+        }
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Login error:', err);
       setError('Server error');
     } finally {
       setLoading(false);
@@ -56,7 +64,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 font-bold bg-green-500 text-black rounded hover:bg-green-400"
+            className="w-full py-2 font-bold bg-green-500 text-black rounded hover:bg-green-400 transition-all"
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>

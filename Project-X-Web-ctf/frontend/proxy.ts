@@ -1,31 +1,43 @@
-import { NextResponse, NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+// ✅ small helper: decode base64 safely in Edge runtime
+function decodeJwtPayload(token: string) {
+  try {
+    const base64 = token.split('.')[1];
+    const json = atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
 
 export default function proxy(req: NextRequest) {
   const token = req.cookies.get('token')?.value;
   const { pathname } = req.nextUrl;
 
-  const isProtectedRoute =
-    pathname.startsWith('/dashboard') || pathname.startsWith('/ctf');
-  const isAuthRoute = ['/login', '/register', '/'].includes(pathname);
+  const isProtected = pathname.startsWith('/dashboard') || pathname.startsWith('/ctf');
+  const isAdmin = pathname.startsWith('/admin');
+  const isAuthPage = ['/login', '/register', '/'].includes(pathname);
 
-  if (isProtectedRoute && !token) {
-    const loginUrl = new URL('/login', req.nextUrl.origin);
-    loginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(loginUrl);
+  if (!token && (isProtected || isAdmin)) {
+    return NextResponse.redirect(new URL('/login', req.url));
   }
 
-  if (isAuthRoute && token) {
+  if (isAdmin && token) {
+    const decoded = decodeJwtPayload(token);
+    if (!decoded || decoded.role !== 'admin') {
+      return NextResponse.redirect(new URL('/dashboard', req.url));
+    }
+  }
+
+  if (isAuthPage && token) {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 
   return NextResponse.next();
 }
 
-// 👇 Apply middleware to these routes
 export const config = {
-  matcher: [
-    '/dashboard/:path*',
-    '/ctf/:path*',
-    '/',
-  ],
+  matcher: ['/dashboard/:path*', '/ctf/:path*', '/login', '/register', '/', '/admin/:path*'],
 };

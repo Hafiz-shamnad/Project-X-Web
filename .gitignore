@@ -8,7 +8,7 @@ out/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
+scripts/
 # ===================================
 # Python / FastAPI
 # ===================================
@@ -39,3 +39,5 @@ instance/
 Thumbs.db
 *.swp
 *.swo
+Project-X-Web-ctf/backend/cookies.txt
+.gitignore
