@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const { initDB } = require('./src/config/db');
+const path = require('path');
+
 
 const challengeRoutes = require('./src/routes/challengeRoutes');
 const leaderboardRoutes = require('./src/routes/leaderboardRoutes');
@@ -29,6 +31,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/flag', flagRoutes); 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health endpoint
 app.get('/api/health', (req, res) => {

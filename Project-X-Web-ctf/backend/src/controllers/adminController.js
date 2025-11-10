@@ -64,3 +64,29 @@ exports.deleteChallenge = async (req, res) => {
     res.status(500).json({ error: 'server_error' });
   }
 };
+
+exports.getAllChallenges = async (req, res) => {
+  try {
+    const challenges = await prisma.challenge.findMany({
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        category: true,
+        difficulty: true,
+        points: true,
+        filePath: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(challenges);
+  } catch (err) {
+  console.error('❌ Error fetching challenges:', err.message);
+  console.error(err.stack);
+  res.status(500).json({ error: err.message });
+}
+
+};
+
