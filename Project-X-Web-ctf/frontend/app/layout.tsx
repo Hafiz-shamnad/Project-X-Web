@@ -1,12 +1,14 @@
 // ===================================
 // app/layout.tsx
 // ===================================
-import type { Metadata } from 'next';
-import './globals.css';
+import type { Metadata } from "next";
+import "./globals.css";
+import Navbar from "./components/Navbar";
+
 
 export const metadata: Metadata = {
-  title: 'Project X - CTF Platform',
-  description: 'Capture The Flag hacking challenges',
+  title: "Project X - CTF Platform",
+  description: "Capture The Flag hacking challenges",
 };
 
 export default function RootLayout({
@@ -16,7 +18,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="font-mono">{children}</body>
+      <body className="font-mono">
+        <Navbar />
+        {children}
+      </body>
     </html>
   );
 }
