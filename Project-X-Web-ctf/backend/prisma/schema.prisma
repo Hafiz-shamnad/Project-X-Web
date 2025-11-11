@@ -30,18 +30,24 @@ model User {
   passwordHash String
   role         String    @default("user") // 'user' | 'admin'
   createdAt    DateTime  @default(now())
-  solved       Solved[]
   attempts     Attempt[] // optional attempt logs
+  teamId        Int?      // ✅ user can belong to one team
+  team          Team?     @relation("TeamMembers", fields: [teamId], references: [id])
+  solved       Solved[]  @relation("UserSolves")
 }
 
 model Solved {
   id           Int       @id @default(autoincrement())
-  user         User      @relation(fields: [userId], references: [id])
+  user         User     @relation("UserSolves", fields: [userId], references: [id])
   userId       Int
   challenge    Challenge @relation(fields: [challengeId], references: [id])
   challengeId  Int
   solvedAt     DateTime  @default(now())
+  teamId       Int? 
+  team         Team?    @relation("TeamSolves", fields: [teamId], references: [id])
+  points       Int      @default(0) 
 
+  createdAt    DateTime @default(now())
   @@unique([userId, challengeId])
 }
 
@@ -66,4 +72,13 @@ model Event {
   freezeAt    DateTime?  // optional freeze time for leaderboard
   createdAt   DateTime @default(now())
   challenges  Challenge[]
+}
+
+model Team {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  joinCode  String    @unique
+  createdAt DateTime  @default(now())
+  members   User[]    @relation("TeamMembers")
+  solved    Solved[]  @relation("TeamSolves")
 }
