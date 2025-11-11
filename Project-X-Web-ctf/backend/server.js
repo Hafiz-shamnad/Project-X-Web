@@ -12,6 +12,7 @@ const flagRoutes = require('./src/routes/flagRoutes');
 const authRoutes = require('./src/routes/authRoutes');
 const adminRoutes = require('./src/routes/adminRoutes');
 const teamRoutes = require('./src/routes/teamRoutes');
+const profileRoutes = require('./src/routes/profileRoutes')
 
 const app = express();
 app.use(express.json());
@@ -33,6 +34,8 @@ app.use('/api/flag', flagRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/team', teamRoutes);
+app.use('/api/profile', profileRoutes);
+
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Terminal, Lock, Unlock, Flag, Trophy, Users, Target, Shield, Code, Zap } from 'lucide-react';
 import FlagModal from '../components/FlagModal';
-import LogoutButton from '../components/LogoutButton';
+
 
 
 export default function ProjectXCTF() {
@@ -70,36 +70,6 @@ export default function ProjectXCTF() {
 
   return (
     <div className="min-h-screen bg-black text-green-500">
-      {/* HEADER */}
-<header className="border-b-2 border-green-500 bg-black sticky top-0 z-50">
-  <div className="max-w-7xl mx-auto px-4 py-4">
-    <div className="flex items-center justify-between">
-      <div className="flex items-center space-x-3">
-        <Shield className="w-8 h-8 text-green-500" />
-        <h1 className="text-3xl font-bold text-green-500">&gt; PROJECT_X</h1>
-      </div>
-
-      <div className="flex items-center space-x-6">
-        <div className="flex items-center space-x-2">
-          <Trophy className="w-5 h-5" />
-          <span className="text-sm">Rank: #42</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Flag className="w-5 h-5" />
-          <span className="text-sm">
-            Score:{' '}
-            {solvedChallenges.reduce(
-              (sum, id) => sum + (challenges.find((c) => c.id === id)?.points || 0),
-              0
-            )}
-          </span>
-        </div>
-
-        <LogoutButton backendURL={backendURL} />
-      </div>
-    </div>
-  </div>
-</header>
 
 
       {/* HERO */}

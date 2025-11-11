@@ -2,10 +2,10 @@
 
 import React, { useState } from 'react';
 import { LogOut } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import ConfirmModal from './ConfirmModal';
 
 interface LogoutButtonProps {
-  backendURL: string;
+  backendURL?: string;
 }
 
 export default function LogoutButton({ backendURL }: LogoutButtonProps) {
@@ -15,7 +15,7 @@ export default function LogoutButton({ backendURL }: LogoutButtonProps) {
   const handleLogout = async () => {
     setLoading(true);
     try {
-      await fetch(`${backendURL}/auth/logout`, {
+      await fetch(`${backendURL || 'http://localhost:4000'}/auth/logout`, {
         method: 'POST',
         credentials: 'include',
       });
@@ -30,7 +30,6 @@ export default function LogoutButton({ backendURL }: LogoutButtonProps) {
 
   return (
     <>
-      {/* 🔴 Main Logout Button */}
       <button
         onClick={() => setShowConfirm(true)}
         disabled={loading}
@@ -40,45 +39,16 @@ export default function LogoutButton({ backendURL }: LogoutButtonProps) {
         {loading ? 'Logging out...' : 'Logout'}
       </button>
 
-      {/* 🧠 Confirmation Modal */}
-      <AnimatePresence>
-        {showConfirm && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              className="bg-gray-900 border border-green-500 p-8 rounded-xl text-center shadow-lg"
-            >
-              <h3 className="text-xl font-bold mb-4 text-green-400">
-                Confirm Logout
-              </h3>
-              <p className="text-green-300 mb-6">
-                Are you sure you want to leave this session?
-              </p>
-              <div className="flex justify-center space-x-4">
-                <button
-                  onClick={handleLogout}
-                  className="bg-green-500 text-black px-5 py-2 rounded font-bold hover:bg-green-400"
-                >
-                  Yes, Logout
-                </button>
-                <button
-                  onClick={() => setShowConfirm(false)}
-                  className="bg-gray-700 text-green-400 px-5 py-2 rounded font-bold hover:bg-gray-600"
-                >
-                  Cancel
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* 🧠 Use the reusable modal here */}
+      <ConfirmModal
+        isOpen={showConfirm}
+        title="Confirm Logout"
+        message="Are you sure you want to leave this session?"
+        confirmText="Yes, Logout"
+        cancelText="Cancel"
+        onConfirm={handleLogout}
+        onCancel={() => setShowConfirm(false)}
+      />
     </>
   );
 }
