@@ -124,3 +124,44 @@ exports.getMyTeam = async (req, res) => {
     res.status(500).json({ error: 'Server error fetching team' });
   }
 };
+
+exports.getTeamSolves = async (req, res) => {
+  try {
+    const teamId = parseInt(req.params.id, 10);
+    if (isNaN(teamId)) {
+      return res.status(400).json({ error: "Invalid team ID" });
+    }
+
+    const team = await prisma.team.findUnique({
+      where: { id: teamId },
+      include: {
+        members: {
+          include: {
+            solved: { // ✅ correct relation name
+              include: { challenge: true },
+              orderBy: { createdAt: "asc" },
+            },
+          },
+        },
+      },
+    });
+
+    if (!team) return res.status(404).json({ error: "Team not found" });
+
+    // Flatten all solves with user info
+    const solves = team.members?.flatMap((m) =>
+      m.solved?.map((s) => ({
+        username: m.username,
+        challengeId: s.challengeId,
+        createdAt: s.createdAt,
+        challenge: s.challenge,
+      })) || []
+    ) || [];
+
+    res.json({ teamId, solved: solves });
+  } catch (err) {
+    console.error("❌ Team solves error:", err);
+    res.status(500).json({ error: "Server error fetching team solves" });
+  }
+};
+
