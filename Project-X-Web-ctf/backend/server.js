@@ -36,7 +36,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/profile', profileRoutes);
 
-
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const fs = require('fs');

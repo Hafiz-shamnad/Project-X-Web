@@ -1,7 +1,14 @@
 const express = require('express');
-const { getLeaderboard } = require('../controllers/leaderboardController');
 const router = express.Router();
+const leaderboardController = require('../controllers/leaderboardController');
 
-router.get('/', getLeaderboard);
+// 🌍 Global User Leaderboard
+router.get('/', leaderboardController.getLeaderboard);
+
+// 🏆 Team Leaderboard
+router.get('/teams', leaderboardController.getTeamLeaderboard);
+
+// 👥 Team Member Leaderboard (specific team)
+router.get('/team/:id/members', leaderboardController.getTeamMembersLeaderboard);
 
 module.exports = router;

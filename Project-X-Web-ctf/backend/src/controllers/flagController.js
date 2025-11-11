@@ -20,7 +20,7 @@ exports.submitFlag = async (req, res) => {
     // 🧩 find or create user
     let user = await prisma.user.findUnique({ where: { username } });
     if (!user) {
-      user = await prisma.user.create({ data: { username, passwordHash: '' } });
+      return res.status(400).json({ error: 'User not found in Databse' });
     }
 
     // 🧠 get user's team (if any)
