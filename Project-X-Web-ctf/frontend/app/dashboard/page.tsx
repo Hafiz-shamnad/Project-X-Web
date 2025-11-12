@@ -9,10 +9,13 @@ import {
   Trophy,
   Target,
   Zap,
+  Shield,
+  ArrowLeft,
+  ArrowRight,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import FlagModal from "../components/FlagModal";
-import Leaderboard from "../components/Leaderboard"; // ✅ reusable component
+import Leaderboard from "../components/Leaderboard";
 
 interface Challenge {
   id: number;
@@ -21,12 +24,7 @@ interface Challenge {
   category: string;
   difficulty: string;
   points: number;
-}
-
-interface SolvedChallenge {
-  challengeId: number;
-  createdAt?: string;
-  challenge?: Challenge;
+  released?: boolean;
 }
 
 export default function ProjectXCTF() {
@@ -35,16 +33,18 @@ export default function ProjectXCTF() {
   );
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [solvedChallenges, setSolvedChallenges] = useState<number[]>([]);
+  const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(
+    null
+  );
   const [username, setUsername] = useState("");
   const [teamId, setTeamId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
   const [flagModalOpen, setFlagModalOpen] = useState(false);
-  const [activeChallenge, setActiveChallenge] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const backendURL =
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
-  // ✅ Fetch user info (username + teamId)
+  // 🧠 Fetch user info
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -57,41 +57,29 @@ export default function ProjectXCTF() {
           setTeamId(data.user.teamId ?? null);
         }
       } catch (err) {
-        console.error("⚠️ Error fetching user info:", err);
+        console.error("⚠️ Error fetching user:", err);
       }
     };
     fetchUser();
   }, [backendURL]);
 
-  // ✅ Fetch challenges + solved status (team-level if part of a team)
-  const fetchChallengesAndSolves = async () => {
+  // 🧩 Fetch Challenges
+  const fetchChallenges = async () => {
     try {
       const challengeRes = await fetch(`${backendURL}/challenges`, {
         credentials: "include",
       });
       const challengeData: Challenge[] = await challengeRes.json();
+      setChallenges(challengeData.filter((c) => c.released));
 
-      // show only released challenges to regular users
-      const publicChallenges = challengeData.filter(
-        (c: any) => c.released === true
-      );
-      setChallenges(publicChallenges);
-
-      // If user is in a team → fetch team solves
-      const solveRes = teamId
-        ? await fetch(`${backendURL}/team/${teamId}/solves`, {
-            credentials: "include",
-          })
-        : await fetch(`${backendURL}/user/${username}`, {
-            credentials: "include",
-          });
-
+      const solveRes = await fetch(`${backendURL}/team/${teamId}/solves`, {
+        credentials: "include",
+      });
       const solveData = await solveRes.json();
-      const solvedList =
-        (solveData.solved as SolvedChallenge[] | undefined)?.map(
-          (s) => s.challengeId
-        ) || [];
-      setSolvedChallenges(solvedList);
+      const solvedIds =
+        solveData?.solved?.map((s: { challengeId: number }) => s.challengeId) ||
+        [];
+      setSolvedChallenges(solvedIds);
     } catch (err) {
       console.error("❌ Error fetching challenges:", err);
     } finally {
@@ -100,171 +88,184 @@ export default function ProjectXCTF() {
   };
 
   useEffect(() => {
-    if (!username) return;
-    fetchChallengesAndSolves();
-    const interval = setInterval(fetchChallengesAndSolves, 60000);
-    return () => clearInterval(interval);
-  }, [username, teamId]);
+    if (username) fetchChallenges();
+  }, [username]);
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case "Easy":
-        return "text-green-500";
+        return "text-green-400";
       case "Medium":
-        return "text-yellow-500";
+        return "text-yellow-400";
       case "Hard":
-        return "text-red-500";
+        return "text-red-400";
       default:
-        return "text-gray-500";
+        return "text-gray-400";
     }
   };
 
-  if (loading) {
+  if (loading)
     return (
       <div className="flex items-center justify-center min-h-screen bg-black text-green-500">
-        <Terminal className="w-8 h-8 mr-2 animate-spin" /> Loading CTF data...
+        <Terminal className="w-8 h-8 mr-2 animate-spin" /> Loading CTF Arena...
       </div>
     );
-  }
 
   return (
-    <div className="min-h-screen bg-black text-green-500">
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-950 text-green-400 font-mono">
       <Toaster position="top-right" />
 
-      {/* 🧠 HERO */}
-      <div className="bg-black py-16 border-b border-green-500 text-center">
-        <Terminal className="w-16 h-16 mx-auto mb-4 text-green-500" />
-        <h2 className="text-4xl font-bold mb-4">
-          <span className="text-white">CAPTURE THE </span>
-          <span className="text-green-500">FLAG</span>
-        </h2>
-        <p className="text-green-300 text-lg max-w-2xl mx-auto">
-          Real-time CTF scoreboard — track your team’s dominance and progress!
-        </p>
-      </div>
-
-      {/* 🧭 TABS */}
-      <div className="max-w-7xl mx-auto px-4 mt-8">
-        <div className="flex space-x-4 border-b border-green-500">
-          {["challenges", "leaderboard"].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab as any)}
-              className={`px-6 py-3 font-bold ${
-                activeTab === tab
-                  ? "border-b-2 border-green-500 text-green-500"
-                  : "text-gray-500 hover:text-green-500"
-              }`}
-            >
-              {tab === "challenges" ? (
-                <>
-                  <Target className="w-4 h-4 inline-block mr-2" /> CHALLENGES
-                </>
-              ) : (
-                <>
-                  <Trophy className="w-4 h-4 inline-block mr-2" /> LEADERBOARD
-                </>
-              )}
-            </button>
-          ))}
+      {/* HEADER */}
+      <header className="flex items-center justify-between px-6 py-5 border-b border-green-500/30 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <Shield className="w-8 h-8 text-green-400" />
+          <h1 className="text-2xl font-bold text-green-400">
+            PROJECT_X CTF ARENA
+          </h1>
         </div>
-      </div>
+        <div className="flex gap-3 text-sm">
+          <button
+            onClick={() => setActiveTab("challenges")}
+            className={`px-5 py-2 rounded-md font-semibold transition-all ${
+              activeTab === "challenges"
+                ? "bg-green-500/20 border border-green-500 text-green-400"
+                : "text-gray-400 hover:text-green-400"
+            }`}
+          >
+            <Target className="inline w-4 h-4 mr-1" /> Challenges
+          </button>
+          <button
+            onClick={() => setActiveTab("leaderboard")}
+            className={`px-5 py-2 rounded-md font-semibold transition-all ${
+              activeTab === "leaderboard"
+                ? "bg-yellow-500/20 border border-yellow-500 text-yellow-400"
+                : "text-gray-400 hover:text-yellow-400"
+            }`}
+          >
+            <Trophy className="inline w-4 h-4 mr-1" /> Leaderboard
+          </button>
+        </div>
+      </header>
 
-      {/* 🧩 CHALLENGES TAB */}
-      {activeTab === "challenges" && (
-        <div className="max-w-7xl mx-auto px-4 py-8 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {challenges.map((challenge) => (
-            <div
-              key={challenge.id}
-              className="bg-gray-900 border border-green-500 rounded-lg p-6 hover:bg-gray-800 transition-colors"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  {solvedChallenges.includes(challenge.id) ? (
-                    <Unlock className="w-5 h-5 text-green-500" />
-                  ) : (
-                    <Lock className="w-5 h-5 text-red-500" />
-                  )}
-                  <span className="text-xs bg-gray-800 px-2 py-1 rounded text-green-500">
-                    {challenge.category}
-                  </span>
-                </div>
-                <span
-                  className={`text-sm font-bold ${getDifficultyColor(
-                    challenge.difficulty
-                  )}`}
-                >
-                  {challenge.difficulty}
-                </span>
-              </div>
+      {/* 💻 LAYOUT */}
+      {activeTab === "challenges" ? (
+        <main className="flex flex-col md:flex-row h-[calc(100vh-80px)] overflow-hidden">
+          {/* LEFT: Challenge List */}
+          <aside className="md:w-1/3 lg:w-1/4 bg-gray-950 border-r border-green-500/20 overflow-y-auto no-scrollbar">
+            <div className="p-4 border-b border-green-500/20">
+              <h2 className="text-lg font-bold text-green-400 flex items-center gap-2">
+                <Target className="w-5 h-5" /> Challenges
+              </h2>
+            </div>
 
-              <h3 className="text-xl font-bold mb-2 text-white">
-                {challenge.name}
-              </h3>
-              <p className="text-green-300 text-sm mb-4">
-                {challenge.description}
-              </p>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Zap className="w-4 h-4" />
-                  <span className="font-bold">{challenge.points} pts</span>
-                </div>
+            <div className="divide-y divide-green-900/40">
+              {challenges.map((c) => (
                 <button
-                  onClick={() => {
-                    setActiveChallenge(challenge.id);
-                    setFlagModalOpen(true);
-                  }}
-                  className={`px-4 py-2 rounded font-bold transition-colors ${
-                    solvedChallenges.includes(challenge.id)
-                      ? "bg-green-500 text-black hover:bg-green-400"
-                      : "bg-gray-800 text-green-500 border border-green-500 hover:bg-green-500 hover:text-black"
+                  key={c.id}
+                  onClick={() => setSelectedChallenge(c)}
+                  className={`w-full text-left p-4 hover:bg-green-500/10 transition-all ${
+                    selectedChallenge?.id === c.id
+                      ? "bg-green-500/20 border-l-4 border-green-500"
+                      : ""
                   }`}
                 >
-                  {solvedChallenges.includes(challenge.id) ? "SOLVED" : "HACK"}
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-gray-200">{c.name}</span>
+                    <span
+                      className={`text-xs font-bold ${getDifficultyColor(
+                        c.difficulty
+                      )}`}
+                    >
+                      {c.difficulty}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-500 flex items-center gap-2 mt-1">
+                    <Zap className="w-3 h-3" /> {c.points} pts
+                    {solvedChallenges.includes(c.id) && (
+                      <span className="text-green-500 text-xs">✓ Solved</span>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </aside>
+
+          {/* RIGHT: Challenge Detail */}
+          <section className="flex-1 p-6 overflow-y-auto backdrop-blur-sm">
+            {selectedChallenge ? (
+              <div className="bg-gray-900/60 border border-green-500/30 rounded-xl p-8 shadow-lg backdrop-blur-lg h-full">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold text-white">
+                    {selectedChallenge.name}
+                  </h2>
+                  <span
+                    className={`text-sm font-semibold ${getDifficultyColor(
+                      selectedChallenge.difficulty
+                    )}`}
+                  >
+                    {selectedChallenge.difficulty}
+                  </span>
+                </div>
+
+                <div className="text-gray-400 text-sm mb-6">
+                  <p>{selectedChallenge.description}</p>
+                </div>
+
+                <div className="flex items-center justify-between text-sm text-gray-500 mb-6">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-yellow-400" />
+                    {selectedChallenge.points} Points
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Flag className="w-4 h-4 text-green-400" />
+                    {selectedChallenge.category}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setFlagModalOpen(true)}
+                  className={`px-6 py-3 rounded-md font-bold text-black transition-all ${
+                    solvedChallenges.includes(selectedChallenge.id)
+                      ? "bg-green-500 cursor-not-allowed"
+                      : "bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400"
+                  }`}
+                  disabled={solvedChallenges.includes(selectedChallenge.id)}
+                >
+                  {solvedChallenges.includes(selectedChallenge.id)
+                    ? "✔ Already Solved"
+                    : "Submit Flag"}
                 </button>
               </div>
-            </div>
-          ))}
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                <ArrowLeft className="w-8 h-8 mb-3 text-green-500" />
+                <p>Select a challenge from the list to view details</p>
+              </div>
+            )}
+          </section>
+        </main>
+      ) : (
+        <div className="p-6">
+          <Leaderboard backendUrl={backendURL} teamId={null} />
         </div>
       )}
 
-      {/* 🏆 TEAM-LEVEL LEADERBOARD TAB */}
-      {activeTab === "leaderboard" && (
-        <Leaderboard backendUrl={backendURL} teamId={null} />
-      )}
-
-      {/* 🚩 FLAG MODAL */}
+      {/* FLAG MODAL */}
       <FlagModal
         open={flagModalOpen}
-        onClose={() => {
-          setFlagModalOpen(false);
-          setActiveChallenge(null);
-        }}
+        onClose={() => setFlagModalOpen(false)}
         onSuccess={async (data) => {
-          if (data.status === "correct" && activeChallenge) {
-            toast.success(`Challenge #${activeChallenge} solved! 🏆`);
-            setSolvedChallenges((prev) =>
-              prev.includes(activeChallenge) ? prev : [...prev, activeChallenge]
-            );
-            await fetchChallengesAndSolves();
+          if (data.status === "correct") {
+            toast.success("Correct Flag! 🏆");
+            fetchChallenges();
+          } else {
+            toast.error("Wrong flag. Try again.");
           }
         }}
         username={username}
-        challengeId={activeChallenge}
+        challengeId={selectedChallenge?.id ?? null}
         backendUrl={backendURL}
       />
-
-      {/* 🧱 FOOTER */}
-      <footer className="border-t border-green-500 mt-16 py-8">
-        <div className="max-w-7xl mx-auto px-4 text-center text-gray-500">
-          <p className="text-sm">
-            <span className="text-green-500">&gt;</span> PROJECT_X CTF Platform
-            | <span className="text-green-500">root@localhost</span>:~#
-            hack_the_planet
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }

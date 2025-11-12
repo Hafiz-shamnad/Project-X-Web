@@ -9,7 +9,10 @@ exports.getLeaderboard = async (req, res) => {
 
     const leaderboard = users
       .map((u) => {
-        const score = u.solved.reduce((sum, s) => sum + (s.challenge.points || 0), 0);
+        const score = u.solved.reduce(
+          (sum, s) => sum + (s.challenge.points || 0),
+          0
+        );
         return {
           id: u.id,
           username: u.username,
@@ -38,26 +41,48 @@ exports.getTeamLeaderboard = async (req, res) => {
       include: {
         members: {
           include: {
-            solved: { include: { challenge: true } },
+            solved: {
+              include: { challenge: true },
+            },
           },
         },
       },
     });
 
     const leaderboard = teams
+      // hide teams that are currently banned
+      .filter((team) => !team.bannedUntil || new Date(team.bannedUntil) < new Date())
       .map((team) => {
-        const teamSolves = team.members.flatMap((m) => m.solved);
-        const totalScore = teamSolves.reduce(
+        // 🔹 Combine all solves from members
+        const allSolves = team.members.flatMap((m) => m.solved);
+
+        // 🔹 Deduplicate by challenge ID (one challenge = one score)
+        const uniqueChallenges = new Map();
+        for (const solve of allSolves) {
+          const cid = solve.challenge.id;
+          if (!uniqueChallenges.has(cid)) uniqueChallenges.set(cid, solve);
+        }
+
+        const uniqueSolves = Array.from(uniqueChallenges.values());
+
+        // 🔹 Compute rawScore & totalScore
+        const rawScore = uniqueSolves.reduce(
           (sum, s) => sum + (s.challenge?.points || 0),
           0
         );
 
+        const penalty = team.penaltyPoints || 0;
+        const totalScore = Math.max(0, rawScore - penalty);
+
         return {
           id: team.id,
           teamName: team.name,
+          rawScore,
           score: totalScore,
-          solved: teamSolves.length,
-          solves: teamSolves.map((s) => ({
+          solved: uniqueSolves.length,
+          penaltyPoints: penalty,
+          bannedUntil: team.bannedUntil,
+          solves: uniqueSolves.map((s) => ({
             challenge: { id: s.challenge.id, points: s.challenge.points },
             createdAt: s.createdAt,
           })),
@@ -72,6 +97,7 @@ exports.getTeamLeaderboard = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
 
 // 👥 TEAM MEMBER LEADERBOARD (within a team)
 exports.getTeamMembersLeaderboard = async (req, res) => {

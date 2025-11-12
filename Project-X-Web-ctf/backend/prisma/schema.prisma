@@ -83,6 +83,8 @@ model Team {
   name      String    @unique
   joinCode  String    @unique
   createdAt DateTime  @default(now())
+  bannedUntil  DateTime? // ⏰ for timeout bans
+  penaltyPoints Int?     @default(0)
   members   User[]    @relation("TeamMembers")
   solved    Solved[]  @relation("TeamSolves")
 }
