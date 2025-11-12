@@ -65,7 +65,7 @@ export default function Leaderboard({
     try {
       setLoading(true);
       const url = teamId
-        ? `${backendUrl}/leaderboard/team/${teamId}/members`
+        ? `${backendUrl}/leaderboard/team/${teamId}`
         : `${backendUrl}/leaderboard/teams`;
 
       const res = await fetch(url, { credentials: "include" });
