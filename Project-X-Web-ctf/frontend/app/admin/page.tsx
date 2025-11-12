@@ -33,6 +33,23 @@ export default function AdminPanel() {
   const [challenges, setChallenges] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
+  const [selectedChallenges, setSelectedChallenges] = useState<number[]>([]);
+
+const handleSelect = (id: number) => {
+  setSelectedChallenges((prev) =>
+    prev.includes(id)
+      ? prev.filter((x) => x !== id)
+      : [...prev, id]
+  );
+};
+
+const bulkRelease = async (release: boolean) => {
+  for (const id of selectedChallenges) {
+    await toggleRelease(id, !release);
+  }
+  setSelectedChallenges([]);
+};
+
 
   const [modal, setModal] = useState({
     isOpen: false,
@@ -325,60 +342,102 @@ export default function AdminPanel() {
         )}
 
         {/* DEPLOY TAB */}
-        {activeTab === "deploy" && (
-          <section className="space-y-6">
-            <h2 className="text-2xl font-bold text-green-400 flex items-center gap-2">
-              <Rocket /> Manage Challenges
-            </h2>
-            <div className="grid gap-4">
-              {challenges.length === 0 && (
-                <div className="text-center text-gray-400 py-12 border border-green-500/20 rounded-xl bg-gray-900/40">
-                  No challenges available yet
-                </div>
-              )}
-              {challenges.map((c) => (
-                <div
-                  key={c.id}
-                  className="bg-gray-900/70 border border-green-600/30 p-5 rounded-xl flex justify-between items-center hover:border-green-500/50 transition-all"
-                >
-                  <div>
-                    <h3 className="text-white font-bold">{c.name}</h3>
-                    <p className="text-sm text-gray-400">
-                      {c.category} • {c.difficulty} •{" "}
-                      <span className="text-yellow-400">{c.points}</span> pts
-                    </p>
-                    <p
-                      className={`text-sm font-semibold mt-1 ${
-                        c.released ? "text-green-400" : "text-red-400"
-                      }`}
-                    >
-                      {c.released ? "🟢 Released" : "🔴 Hidden"}
-                    </p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => toggleRelease(c.id, c.released)}
-                      className={`px-4 py-2 rounded-md font-bold flex items-center gap-1 ${
-                        c.released
-                          ? "bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30"
-                          : "bg-green-500/20 text-green-400 border border-green-500/40 hover:bg-green-500/30"
-                      }`}
-                    >
-                      {c.released ? <EyeOff /> : <Eye />}
-                      {c.released ? "Hide" : "Release"}
-                    </button>
-                    <button
-                      onClick={() => deleteChallenge(c.id)}
-                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 rounded-lg"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+{activeTab === "deploy" && (
+  <section className="space-y-6">
+    <h2 className="text-2xl font-bold text-green-400 flex items-center gap-2">
+      <Rocket /> Manage Challenges
+    </h2>
+
+    {/* Bulk Action Buttons */}
+    {selectedChallenges.length > 0 && (
+      <div className="flex items-center gap-3 bg-gray-900/60 border border-green-600/30 p-3 rounded-lg">
+        <p className="text-gray-300">
+          {selectedChallenges.length} selected
+        </p>
+        <button
+          onClick={() => bulkRelease(true)}
+          className="bg-green-500/20 text-green-400 border border-green-500/40 px-3 py-1 rounded-md hover:bg-green-500/30 font-bold"
+        >
+          🚀 Release Selected
+        </button>
+        <button
+          onClick={() => bulkRelease(false)}
+          className="bg-red-500/20 text-red-400 border border-red-500/40 px-3 py-1 rounded-md hover:bg-red-500/30 font-bold"
+        >
+          🕶 Hide Selected
+        </button>
+        <button
+          onClick={() => setSelectedChallenges([])}
+          className="text-gray-400 hover:text-gray-200"
+        >
+          Clear
+        </button>
+      </div>
+    )}
+
+    <div className="grid gap-4">
+      {challenges.length === 0 && (
+        <div className="text-center text-gray-400 py-12 border border-green-500/20 rounded-xl bg-gray-900/40">
+          No challenges available yet
+        </div>
+      )}
+
+      {challenges.map((c) => (
+        <div
+          key={c.id}
+          className={`bg-gray-900/70 border ${
+            selectedChallenges.includes(c.id)
+              ? "border-green-500/70"
+              : "border-green-600/30"
+          } p-5 rounded-xl flex justify-between items-center hover:border-green-500/50 transition-all`}
+        >
+          <div className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={selectedChallenges.includes(c.id)}
+              onChange={() => handleSelect(c.id)}
+              className="mt-1 accent-green-500"
+            />
+            <div>
+              <h3 className="text-white font-bold">{c.name}</h3>
+              <p className="text-sm text-gray-400">
+                {c.category} • {c.difficulty} •{" "}
+                <span className="text-yellow-400">{c.points}</span> pts
+              </p>
+              <p
+                className={`text-sm font-semibold mt-1 ${
+                  c.released ? "text-green-400" : "text-red-400"
+                }`}
+              >
+                {c.released ? "🟢 Released" : "🔴 Hidden"}
+              </p>
             </div>
-          </section>
-        )}
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => toggleRelease(c.id, c.released)}
+              className={`px-4 py-2 rounded-md font-bold flex items-center gap-1 ${
+                c.released
+                  ? "bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30"
+                  : "bg-green-500/20 text-green-400 border border-green-500/40 hover:bg-green-500/30"
+              }`}
+            >
+              {c.released ? <EyeOff /> : <Eye />}
+              {c.released ? "Hide" : "Release"}
+            </button>
+            <button
+              onClick={() => deleteChallenge(c.id)}
+              className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 rounded-lg"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
 
         {/* LEADERBOARD TAB */}
         {activeTab === "leaderboard" && (
