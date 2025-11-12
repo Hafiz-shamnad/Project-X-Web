@@ -70,7 +70,12 @@ export default function ProjectXCTF() {
         credentials: "include",
       });
       const challengeData: Challenge[] = await challengeRes.json();
-      setChallenges(challengeData);
+
+      // show only released challenges to regular users
+      const publicChallenges = challengeData.filter(
+        (c: any) => c.released === true
+      );
+      setChallenges(publicChallenges);
 
       // If user is in a team → fetch team solves
       const solveRes = teamId
@@ -255,7 +260,8 @@ export default function ProjectXCTF() {
         <div className="max-w-7xl mx-auto px-4 text-center text-gray-500">
           <p className="text-sm">
             <span className="text-green-500">&gt;</span> PROJECT_X CTF Platform
-            | <span className="text-green-500">root@localhost</span>:~# hack_the_planet
+            | <span className="text-green-500">root@localhost</span>:~#
+            hack_the_planet
           </p>
         </div>
       </footer>

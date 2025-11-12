@@ -40,3 +40,26 @@ exports.getChallenges = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.getPublicChallenges = async (req, res) => {
+  try {
+    const challenges = await prisma.challenge.findMany({
+      where: { released: true },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        category: true,
+        difficulty: true,
+        points: true,
+        filePath: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(challenges);
+  } catch (err) {
+    console.error('❌ Error fetching public challenges:', err);
+    res.status(500).json({ error: 'Failed to fetch public challenges' });
+  }
+};

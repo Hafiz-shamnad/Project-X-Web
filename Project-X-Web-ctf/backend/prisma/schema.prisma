@@ -17,6 +17,7 @@ model Challenge {
   flagHash    String?        // hashed (FLAG_SALT + flag) stored
   filePath    String?        // optional uploaded file path
   createdAt   DateTime @default(now())
+  released    Boolean  @default(false) 
   eventId     Int? 
   event       Event?   @relation(fields: [eventId], references: [id])
   solvedBy    Solved[]
