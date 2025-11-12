@@ -14,33 +14,34 @@ import {
 import { LineChart as ChartIcon, Flag } from "lucide-react";
 
 interface TimelinePoint {
-  time: number; // ✅ numeric timestamp for proper chart scaling
+  time: number;
   score: number;
   label: string;
 }
 
-type TeamData =
-  | {
-      id?: number;
-      teamName: string;
-      score: number;
-      solved: number;
-      solves?: { challenge: { points: number }; createdAt: string }[];
-    }
-  | {
-      id?: number;
-      username: string;
-      score: number;
-      solved: number;
-      solves?: { challenge: { points: number }; createdAt: string }[];
-    };
+interface Solve {
+  challenge: { points: number };
+  createdAt: string;
+}
+
+type TeamData = {
+  id?: number;
+  username?: string;
+  teamName?: string;
+  score: number;
+  solved: number;
+  solves?: Solve[];
+};
 
 interface LeaderboardProps {
   backendUrl: string;
-  teamId: number | null; // null for global, teamId for member leaderboard
+  teamId?: number | null;
 }
 
-export default function Leaderboard({ backendUrl, teamId }: LeaderboardProps) {
+export default function Leaderboard({
+  backendUrl,
+  teamId = null,
+}: LeaderboardProps) {
   const [leaderboard, setLeaderboard] = useState<TeamData[]>([]);
   const [timelineData, setTimelineData] = useState<
     Record<string, TimelinePoint[]>
@@ -60,12 +61,11 @@ export default function Leaderboard({ backendUrl, teamId }: LeaderboardProps) {
     "#33FFAA",
   ];
 
-  // ✅ Fetch leaderboard
   const fetchLeaderboard = async () => {
     try {
       setLoading(true);
       const url = teamId
-        ? `${backendUrl}/team/${teamId}/members`
+        ? `${backendUrl}/leaderboard/team/${teamId}/members`
         : `${backendUrl}/leaderboard/teams`;
 
       const res = await fetch(url, { credentials: "include" });
@@ -73,55 +73,67 @@ export default function Leaderboard({ backendUrl, teamId }: LeaderboardProps) {
 
       const entries: TeamData[] = Array.isArray(data)
         ? data
+        : Array.isArray(data.leaderboard)
+        ? data.leaderboard
         : Array.isArray(data.teams)
         ? data.teams
         : [];
 
-      setLeaderboard(entries);
+      const normalized: TeamData[] = entries.map((item: any) => ({
+        id: item.id,
+        username: item.username ?? undefined,
+        teamName: item.teamName ?? data.teamName ?? "Unknown Team",
+        score: item.score ?? item.points ?? 0,
+        solved: item.solved ?? item.solves?.length ?? 0,
+        solves: item.solves ?? [],
+      }));
 
-      // ✅ Build timeline data
-      const topTeams = entries.slice(0, 10);
+      setLeaderboard(normalized);
+
+      // Build timeline for top 10
+      const top = normalized.slice(0, 10);
       const timelines: Record<string, TimelinePoint[]> = {};
 
-      for (const team of topTeams) {
-        const solves = (Array.isArray(team.solves) ? team.solves : []).sort(
+      for (const member of top) {
+        const label = member.username || member.teamName || "Unknown";
+        const sortedSolves = (member.solves ?? []).sort(
           (a, b) =>
-            new Date(a.createdAt).getTime() -
-            new Date(b.createdAt).getTime()
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
 
         let cumulative = 0;
+        const points: TimelinePoint[] = [];
 
-        // ✅ Use dynamic label (teamName or username)
-        const label =
-          "teamName" in team
-            ? team.teamName
-            : "username" in team
-            ? team.username
-            : "Unknown";
-
-        timelines[label] = solves.map((s) => {
-          cumulative += s.challenge?.points || 0;
-          return {
-            time: new Date(s.createdAt).getTime(), // ✅ numeric timestamp
+        for (const solve of sortedSolves) {
+          cumulative += solve.challenge?.points || 0;
+          points.push({
+            time: new Date(solve.createdAt).getTime(),
             score: cumulative,
-            label,
-          };
-        });
-
-        // ✅ Add base zero point so all start from 0
-        if (timelines[label]?.length) {
-          timelines[label].unshift({
-            time: timelines[label][0].time - 60000,
-            score: 0,
             label,
           });
         }
+
+        // Add starting point
+        if (points.length) {
+          points.unshift({
+            time: points[0].time - 60_000,
+            score: 0,
+            label,
+          });
+        } else {
+          points.push({
+            time: Date.now(),
+            score: member.score,
+            label,
+          });
+        }
+
+        timelines[label] = points;
       }
 
       setTimelineData(timelines);
     } catch (err) {
-      console.error("❌ Error fetching leaderboard:", err);
+      console.error("❌ Leaderboard fetch error:", err);
     } finally {
       setLoading(false);
     }
@@ -129,7 +141,7 @@ export default function Leaderboard({ backendUrl, teamId }: LeaderboardProps) {
 
   useEffect(() => {
     fetchLeaderboard();
-    const interval = setInterval(fetchLeaderboard, 60000);
+    const interval = setInterval(fetchLeaderboard, 60000); // auto-refresh every 1 min
     return () => clearInterval(interval);
   }, [teamId]);
 
@@ -144,12 +156,12 @@ export default function Leaderboard({ backendUrl, teamId }: LeaderboardProps) {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
-      {/* 🟩 SCORE GROWTH CHART */}
-      <div className="bg-gray-900 border border-green-500 rounded-lg p-6 mb-8">
+      {/* SCORE GROWTH CHART */}
+      <div className="bg-gradient-to-br from-black via-gray-900 to-black border border-green-500/40 rounded-xl p-6 mb-8 shadow-lg shadow-green-500/10">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+          <h3 className="text-xl font-bold text-green-300 flex items-center gap-2">
             <ChartIcon className="w-5 h-5 text-green-400" />
-            {teamId ? "Team Member Progress" : "Top Teams – Score Progress"}
+            {teamId ? "Team Member Progress" : "Top Teams – Score Timeline"}
           </h3>
         </div>
 
@@ -160,25 +172,23 @@ export default function Leaderboard({ backendUrl, teamId }: LeaderboardProps) {
               dataKey="time"
               type="number"
               domain={["auto", "auto"]}
-              tickFormatter={(time) =>
-                new Date(time).toLocaleTimeString([], {
+              tickFormatter={(t) =>
+                new Date(t).toLocaleTimeString([], {
                   hour: "2-digit",
                   minute: "2-digit",
-                  hour12: false,
                 })
               }
               stroke="#888"
             />
             <YAxis stroke="#888" />
             <Tooltip
-              labelFormatter={(value) =>
-                new Date(value).toLocaleTimeString([], {
+              labelFormatter={(v) =>
+                new Date(v).toLocaleTimeString([], {
                   hour: "2-digit",
                   minute: "2-digit",
-                  hour12: false,
                 })
               }
-              formatter={(value) => [`${value} pts`, "Score"]}
+              formatter={(v) => [`${v} pts`, "Score"]}
               contentStyle={{
                 backgroundColor: "#111",
                 border: "1px solid #0f0",
@@ -197,66 +207,73 @@ export default function Leaderboard({ backendUrl, teamId }: LeaderboardProps) {
                 name={label}
                 stroke={teamColors[idx % teamColors.length]}
                 strokeWidth={2}
-                dot={false}
-                isAnimationActive={true}
+                isAnimationActive
+                dot={{
+                  r: 4,
+                  stroke: teamColors[idx % teamColors.length],
+                  strokeWidth: 2,
+                  fill: "#000",
+                }}
+                activeDot={{
+                  r: 6,
+                  stroke: "#fff",
+                  strokeWidth: 2,
+                  fill: teamColors[idx % teamColors.length],
+                }}
               />
             ))}
           </LineChart>
         </ResponsiveContainer>
 
         <p className="text-center text-sm text-green-400 mt-2">
-          📊 Real-time cumulative scores — time-based and accurate.
+          📊 Real-time cumulative scores
         </p>
       </div>
 
-      {/* 🏆 LEADERBOARD TABLE */}
-      <div className="bg-gray-900 border border-green-500 rounded-lg">
-        <div className="bg-gray-800 px-6 py-4 border-b border-green-500">
-          <h3 className="text-xl font-bold text-white">
+      {/* LEADERBOARD TABLE */}
+      <div className="bg-gradient-to-br from-black via-gray-900 to-black border border-green-500/40 rounded-xl overflow-hidden">
+        <div className="bg-green-950/30 px-6 py-4 border-b border-green-500/30">
+          <h3 className="text-xl font-bold text-green-300">
             {teamId ? "Team Members" : "Top Teams"}
           </h3>
         </div>
 
         {leaderboard.length === 0 ? (
-          <p className="text-center py-6 text-green-400">
-            No teams have scored yet.
-          </p>
+          <p className="text-center py-6 text-green-400">No scores yet.</p>
         ) : (
-          leaderboard.slice(0, 10).map((team, idx) => (
+          leaderboard.slice(0, 10).map((item, idx) => (
             <div
-              key={`${
-                "teamName" in team
-                  ? team.teamName
-                  : "username" in team
-                  ? team.username
-                  : "team"
-              }-${idx}`}
-              className="px-6 py-4 flex items-center justify-between border-b border-gray-800 hover:bg-gray-800 transition-colors"
+              key={item.id ?? idx}
+              className="px-6 py-4 flex items-center justify-between border-b border-gray-800 hover:bg-green-950/10 transition-all duration-200"
             >
               <div className="flex items-center space-x-6">
                 <span
-                  className="text-2xl font-bold w-8"
-                  style={{ color: teamColors[idx % teamColors.length] }}
+                  className={`text-2xl font-bold w-8 ${
+                    idx === 0
+                      ? "text-yellow-400"
+                      : idx === 1
+                      ? "text-gray-300"
+                      : idx === 2
+                      ? "text-amber-600"
+                      : "text-green-400"
+                  }`}
                 >
                   #{idx + 1}
                 </span>
                 <div>
                   <div className="font-bold text-white text-lg">
-                    {"teamName" in team
-                      ? team.teamName
-                      : "username" in team
-                      ? team.username
-                      : "Unknown"}
+                    {item.username || item.teamName}
                   </div>
-                  <div className="text-sm text-green-300">
-                    <Flag className="w-3 h-3 inline-block mr-1" />
-                    {team.solved || 0} challenges solved
+                  <div className="text-sm text-green-300 flex items-center gap-1">
+                    <Flag className="w-3 h-3" />
+                    {item.solved} challenges solved
                   </div>
                 </div>
               </div>
+
               <div className="text-right">
                 <div className="text-2xl font-bold text-green-500">
-                  {team.score}
+                  {item.score}
                 </div>
                 <div className="text-xs text-gray-500">POINTS</div>
               </div>
