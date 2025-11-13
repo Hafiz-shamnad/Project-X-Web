@@ -1,133 +1,187 @@
-const crypto = require("crypto");
-const { prisma } = require("../config/db");
+/**
+ * Admin Controller
+ * -----------------
+ * Handles:
+ *  - Challenge management (create, update, delete, list, toggle release)
+ *  - Team management (list teams, scoring, penalties, bans)
+ */
+
 const fs = require("fs");
+const { prisma } = require("../config/db");
+const hashFlag = require("../utils/hashFlag");
 
-const FLAG_SALT = process.env.FLAG_SALT || "";
+/* -------------------------------------------------------------------------- */
+/*                               Create Challenge                              */
+/* -------------------------------------------------------------------------- */
 
-// 🔐 Hash flag securely
-function hashFlag(flag) {
-  return crypto
-    .createHash("sha256")
-    .update(FLAG_SALT + flag.trim())
-    .digest("hex");
-}
-
-// 🧱 Create challenge
+/**
+ * Create a new challenge.
+ * @route POST /api/admin/challenge
+ */
 exports.createChallenge = async (req, res) => {
   try {
     const { name, category, difficulty, points, description, flag, released } =
       req.body;
-    let filePath = null;
-    if (req.file) filePath = req.file.path;
 
-    const data = {
+    const filePath = req.file ? req.file.path : null;
+
+    const challengeData = {
       name,
       category,
       difficulty,
-      points: Number(points),
       description,
       filePath,
+      points: Number(points),
       released: released === "true",
       flagHash: flag ? hashFlag(flag) : null,
     };
 
-    const ch = await prisma.challenge.create({ data });
-    res.json({ ok: true, challenge: ch });
+    const challenge = await prisma.challenge.create({ data: challengeData });
+    return res.json({ ok: true, challenge });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "server_error" });
+    console.error("Error creating challenge:", err);
+    return res.status(500).json({ error: "Failed to create challenge" });
   }
 };
 
-// ✏️ Update challenge
+/* -------------------------------------------------------------------------- */
+/*                               Update Challenge                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Update an existing challenge.
+ * @route PUT /api/admin/challenge/:id
+ */
 exports.updateChallenge = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, category, difficulty, points, description, flag } = req.body;
 
-    const update = {
+    const updateData = {
       name,
       category,
       difficulty,
-      points: Number(points),
       description,
+      points: Number(points),
     };
-    if (flag) update.flagHash = hashFlag(flag);
-    if (req.file) update.filePath = req.file.path;
 
-    const ch = await prisma.challenge.update({
+    if (flag) updateData.flagHash = hashFlag(flag);
+    if (req.file) updateData.filePath = req.file.path;
+
+    const challenge = await prisma.challenge.update({
       where: { id: Number(id) },
-      data: update,
+      data: updateData,
     });
 
-    res.json({ ok: true, challenge: ch });
+    return res.json({ ok: true, challenge });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "server_error" });
+    console.error("Error updating challenge:", err);
+    return res.status(500).json({ error: "Failed to update challenge" });
   }
 };
 
-// ❌ Delete challenge
+/* -------------------------------------------------------------------------- */
+/*                               Delete Challenge                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Delete a challenge and remove its file.
+ * @route DELETE /api/admin/challenge/:id
+ */
 exports.deleteChallenge = async (req, res) => {
   try {
     const { id } = req.params;
-    const ch = await prisma.challenge.findUnique({
+
+    const challenge = await prisma.challenge.findUnique({
       where: { id: Number(id) },
     });
 
-    if (ch?.filePath && fs.existsSync(ch.filePath)) fs.unlinkSync(ch.filePath);
+    if (!challenge) {
+      return res.status(404).json({ error: "Challenge not found" });
+    }
+
+    if (challenge.filePath && fs.existsSync(challenge.filePath)) {
+      fs.unlinkSync(challenge.filePath);
+    }
+
     await prisma.challenge.delete({ where: { id: Number(id) } });
 
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "server_error" });
+    console.error("Error deleting challenge:", err);
+    return res.status(500).json({ error: "Failed to delete challenge" });
   }
 };
 
-// 📜 Get all challenges
+/* -------------------------------------------------------------------------- */
+/*                               List Challenges                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Retrieve all challenges.
+ * @route GET /api/admin/challenges
+ */
 exports.getAllChallenges = async (req, res) => {
   try {
     const challenges = await prisma.challenge.findMany({
       select: {
         id: true,
         name: true,
-        description: true,
         category: true,
         difficulty: true,
         points: true,
+        description: true,
         filePath: true,
-        createdAt: true,
         released: true,
+        createdAt: true,
       },
       orderBy: { createdAt: "desc" },
     });
-    res.json(challenges);
+
+    return res.json(challenges);
   } catch (err) {
-    console.error("❌ Error fetching challenges:", err);
-    res.status(500).json({ error: "Failed to fetch challenges" });
+    console.error("Error fetching challenges:", err);
+    return res.status(500).json({ error: "Failed to fetch challenges" });
   }
 };
 
-// 🔁 Toggle release / stop
+/* -------------------------------------------------------------------------- */
+/*                           Toggle Challenge Release                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Toggle the release status of a challenge.
+ * @route PATCH /api/admin/challenge/:id/release
+ */
 exports.toggleRelease = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = Number(req.params.id);
     const { released } = req.body;
 
-    const updated = await prisma.challenge.update({
+    const challenge = await prisma.challenge.update({
       where: { id },
       data: { released },
     });
 
-    res.json({ ok: true, updated });
+    return res.json({ ok: true, challenge });
   } catch (err) {
-    console.error("❌ Error toggling release:", err);
-    res.status(500).json({ error: "Failed to toggle release" });
+    console.error("Error toggling challenge release:", err);
+    return res.status(500).json({ error: "Failed to toggle release status" });
   }
 };
 
-// 📊 Get all registered teams with members and solve count
+/* -------------------------------------------------------------------------- */
+/*                                 List Teams                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Retrieve all teams with:
+ *  - Members
+ *  - Unique solves
+ *  - Raw score
+ *  - Final score after penalties
+ *  - Ban status
+ */
 exports.getAllTeams = async (req, res) => {
   try {
     const teams = await prisma.team.findMany({
@@ -138,7 +192,7 @@ exports.getAllTeams = async (req, res) => {
             id: true,
             username: true,
             solved: {
-              include: { challenge: true }, // include challenge to get latest points
+              include: { challenge: true },
             },
           },
         },
@@ -146,19 +200,21 @@ exports.getAllTeams = async (req, res) => {
     });
 
     const formatted = teams.map((team) => {
-      const allSolves = team.members.flatMap((m) => m.solved);
+      const solves = team.members.flatMap((member) => member.solved);
 
-      // Deduplicate challenges (avoid duplicate solves by same team)
+      // Deduplicate solves by challenge ID
       const uniqueChallenges = new Map();
-      for (const solve of allSolves) {
-        if (!uniqueChallenges.has(solve.challenge.id)) {
-          uniqueChallenges.set(solve.challenge.id, solve);
+      for (const solve of solves) {
+        const challengeId = solve.challenge.id;
+        if (!uniqueChallenges.has(challengeId)) {
+          uniqueChallenges.set(challengeId, solve);
         }
       }
+
       const uniqueSolves = Array.from(uniqueChallenges.values());
 
       const rawScore = uniqueSolves.reduce(
-        (sum, s) => sum + (s.challenge?.points || 0),
+        (sum, solve) => sum + (solve.challenge.points || 0),
         0
       );
 
@@ -168,84 +224,108 @@ exports.getAllTeams = async (req, res) => {
       return {
         id: team.id,
         name: team.name,
+        createdAt: team.createdAt,
+        bannedUntil: team.bannedUntil,
+
         members: team.members.map((m) => ({
           id: m.id,
           username: m.username,
         })),
+
         solvedCount: uniqueSolves.length,
         rawScore,
         totalScore,
         penaltyPoints: penalty,
-        createdAt: team.createdAt,
-        bannedUntil: team.bannedUntil,
       };
     });
 
-    res.json(formatted);
+    return res.json(formatted);
   } catch (err) {
-    console.error("❌ Error fetching teams:", err);
-    res.status(500).json({
-      error: "Failed to fetch teams",
-      details: err.message,
-    });
+    console.error("Error fetching teams:", err);
+    return res.status(500).json({ error: "Failed to fetch teams" });
   }
 };
 
+/* -------------------------------------------------------------------------- */
+/*                                   Ban Team                                  */
+/* -------------------------------------------------------------------------- */
 
-// 🚫 Temporarily or permanently ban a team
+/**
+ * Ban a team temporarily or permanently.
+ * @route POST /api/admin/team/:id/ban
+ */
 exports.banTeam = async (req, res) => {
   try {
     const { id } = req.params;
-    const { durationMinutes } = req.body; // 0 means permanent
+    const { durationMinutes } = req.body;
 
-    const bannedUntil =
-      durationMinutes && durationMinutes > 0
-        ? new Date(Date.now() + durationMinutes * 60 * 1000)
-        : null; // null = permanent
+    let bannedUntil;
+
+    if (durationMinutes === 0) {
+      bannedUntil = "PERMANENT";
+    } else if (durationMinutes > 0) {
+      bannedUntil = new Date(Date.now() + durationMinutes * 60 * 1000);
+    } else {
+      return res.status(400).json({ error: "Invalid ban duration" });
+    }
 
     await prisma.team.update({
       where: { id: Number(id) },
       data: { bannedUntil },
     });
 
-    res.json({
+    return res.json({
       ok: true,
       message:
-        durationMinutes > 0
-          ? `Team banned for ${durationMinutes} minutes`
-          : "Team permanently banned",
+        durationMinutes === 0
+          ? "Team permanently banned"
+          : `Team banned for ${durationMinutes} minutes`,
     });
   } catch (err) {
-    console.error("❌ Error banning team:", err);
-    res.status(500).json({ error: "Failed to ban team" });
+    console.error("Error banning team:", err);
+    return res.status(500).json({ error: "Failed to ban team" });
   }
 };
 
-// ♻️ Unban team (optional: reset penalties)
+/* -------------------------------------------------------------------------- */
+/*                                 Unban Team                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Remove ban from a team.
+ * @route POST /api/admin/team/:id/unban
+ */
 exports.unbanTeam = async (req, res) => {
   try {
     const { id } = req.params;
 
     await prisma.team.update({
       where: { id: Number(id) },
-      data: {
-        bannedUntil: null,
-        // Uncomment next line if you want to reset penalty on unban
-        // penaltyPoints: 0,
-      },
+      data: { bannedUntil: null },
     });
 
-    res.json({ ok: true, message: "Team unbanned successfully" });
+    return res.json({
+      ok: true,
+      message: "Team unbanned successfully",
+    });
   } catch (err) {
-    console.error("❌ Error unbanning team:", err);
-    res.status(500).json({ error: "Failed to unban team" });
+    console.error("Error unbanning team:", err);
+    return res.status(500).json({ error: "Failed to unban team" });
   }
 };
 
+/* -------------------------------------------------------------------------- */
+/*                             Apply Team Penalty                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Apply penalty points to a team.
+ * @route POST /api/admin/team/:id/penalty
+ */
 exports.reduceTeamScore = async (req, res) => {
   try {
     const { id } = req.params;
-    const { penalty } = req.body; // e.g. 100
+    const { penalty } = req.body;
 
     const team = await prisma.team.findUnique({
       where: { id: Number(id) },
@@ -254,15 +334,15 @@ exports.reduceTeamScore = async (req, res) => {
       },
     });
 
-    if (!team) return res.status(404).json({ error: "Team not found" });
+    if (!team) {
+      return res.status(404).json({ error: "Team not found" });
+    }
 
-    // Calculate current score before applying new penalty
     const rawScore = team.solved.reduce(
-      (sum, s) => sum + (s.challenge?.points || 0),
+      (sum, solve) => sum + (solve.challenge.points || 0),
       0
     );
 
-    // Add to existing penalty
     const updatedPenalty = (team.penaltyPoints || 0) + Number(penalty);
     const finalScore = Math.max(0, rawScore - updatedPenalty);
 
@@ -271,15 +351,14 @@ exports.reduceTeamScore = async (req, res) => {
       data: { penaltyPoints: updatedPenalty },
     });
 
-    res.json({
+    return res.json({
       ok: true,
-      message: `Penalty of ${penalty} points applied. Total penalty: ${updatedPenalty}`,
+      message: `Penalty applied: ${penalty}. Total penalty: ${updatedPenalty}`,
       rawScore,
       finalScore,
     });
   } catch (err) {
-    console.error("❌ Error reducing team score:", err);
-    res.status(500).json({ error: "Failed to apply penalty" });
+    console.error("Error applying penalty:", err);
+    return res.status(500).json({ error: "Failed to apply penalty" });
   }
 };
-

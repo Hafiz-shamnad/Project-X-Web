@@ -1,108 +1,147 @@
-const { prisma } = require('../config/db');
+/**
+ * Leaderboard Controller
+ * ----------------------
+ * Handles:
+ *  - Global user leaderboard
+ *  - Global team leaderboard
+ *  - Team-specific member leaderboard
+ */
 
-// 🧩 GLOBAL USER LEADERBOARD
+const { prisma } = require("../config/db");
+
+/* -------------------------------------------------------------------------- */
+/*                         GLOBAL USER LEADERBOARD                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Retrieve the global user leaderboard.
+ * Ranking is based on total points from solved challenges.
+ * @route GET /api/leaderboard/users
+ */
 exports.getLeaderboard = async (req, res) => {
   try {
     const users = await prisma.user.findMany({
-      include: { solved: { include: { challenge: true } } },
+      include: {
+        solved: { include: { challenge: true } },
+      },
     });
 
     const leaderboard = users
-      .map((u) => {
-        const score = u.solved.reduce(
-          (sum, s) => sum + (s.challenge.points || 0),
+      .map((user) => {
+        const totalScore = user.solved.reduce(
+          (sum, entry) => sum + (entry.challenge.points || 0),
           0
         );
+
         return {
-          id: u.id,
-          username: u.username,
-          score,
-          solved: u.solved.length,
-          solves: u.solved.map((s) => ({
-            challenge: { id: s.challenge.id, points: s.challenge.points },
-            createdAt: s.createdAt,
+          id: user.id,
+          username: user.username,
+          score: totalScore,
+          solved: user.solved.length,
+          solves: user.solved.map((entry) => ({
+            challenge: { id: entry.challenge.id, points: entry.challenge.points },
+            createdAt: entry.createdAt,
           })),
         };
       })
       .sort((a, b) => b.score - a.score)
-      .map((u, i) => ({ rank: i + 1, ...u }));
+      .map((user, index) => ({ rank: index + 1, ...user }));
 
-    res.json(leaderboard);
+    return res.json(leaderboard);
   } catch (err) {
-    console.error("❌ User leaderboard error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("User leaderboard error:", err);
+    return res.status(500).json({ error: "Failed to fetch leaderboard" });
   }
 };
 
-// 🏆 TEAM LEADERBOARD
+
+/* -------------------------------------------------------------------------- */
+/*                           GLOBAL TEAM LEADERBOARD                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Retrieve the global team leaderboard.
+ * A challenge solved by any member contributes once to team score.
+ * Temporary and expired bans are ignored for listing purposes.
+ * @route GET /api/leaderboard/teams
+ */
 exports.getTeamLeaderboard = async (req, res) => {
   try {
     const teams = await prisma.team.findMany({
       include: {
         members: {
           include: {
-            solved: {
-              include: { challenge: true },
-            },
+            solved: { include: { challenge: true } },
           },
         },
       },
     });
 
     const leaderboard = teams
-      // hide teams that are currently banned
       .filter((team) => !team.bannedUntil || new Date(team.bannedUntil) < new Date())
       .map((team) => {
-        // 🔹 Combine all solves from members
-        const allSolves = team.members.flatMap((m) => m.solved);
+        const allSolves = team.members.flatMap((member) => member.solved);
 
-        // 🔹 Deduplicate by challenge ID (one challenge = one score)
+        // Deduplicate challenge solves for the team
         const uniqueChallenges = new Map();
         for (const solve of allSolves) {
           const cid = solve.challenge.id;
-          if (!uniqueChallenges.has(cid)) uniqueChallenges.set(cid, solve);
+          if (!uniqueChallenges.has(cid)) {
+            uniqueChallenges.set(cid, solve);
+          }
         }
 
         const uniqueSolves = Array.from(uniqueChallenges.values());
 
-        // 🔹 Compute rawScore & totalScore
         const rawScore = uniqueSolves.reduce(
-          (sum, s) => sum + (s.challenge?.points || 0),
+          (sum, entry) => sum + (entry.challenge.points || 0),
           0
         );
 
         const penalty = team.penaltyPoints || 0;
-        const totalScore = Math.max(0, rawScore - penalty);
+        const finalScore = Math.max(0, rawScore - penalty);
 
         return {
           id: team.id,
           teamName: team.name,
           rawScore,
-          score: totalScore,
+          score: finalScore,
           solved: uniqueSolves.length,
           penaltyPoints: penalty,
           bannedUntil: team.bannedUntil,
-          solves: uniqueSolves.map((s) => ({
-            challenge: { id: s.challenge.id, points: s.challenge.points },
-            createdAt: s.createdAt,
+          solves: uniqueSolves.map((entry) => ({
+            challenge: { id: entry.challenge.id, points: entry.challenge.points },
+            createdAt: entry.createdAt,
           })),
         };
       })
       .sort((a, b) => b.score - a.score)
-      .map((team, i) => ({ rank: i + 1, ...team }));
+      .map((team, index) => ({ rank: index + 1, ...team }));
 
-    res.json(leaderboard);
+    return res.json(leaderboard);
   } catch (err) {
-    console.error("❌ Team leaderboard error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("Team leaderboard error:", err);
+    return res.status(500).json({ error: "Failed to fetch team leaderboard" });
   }
 };
 
 
-// 👥 TEAM MEMBER LEADERBOARD (within a team)
+/* -------------------------------------------------------------------------- */
+/*                       TEAM MEMBER INTERNAL LEADERBOARD                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Retrieve leaderboard of members within a specific team.
+ * @route GET /api/leaderboard/team/:id/members
+ */
 exports.getTeamMembersLeaderboard = async (req, res) => {
   try {
-    const teamId = parseInt(req.params.id, 10);
+    const teamId = Number(req.params.id);
+
+    if (isNaN(teamId)) {
+      return res.status(400).json({ error: "Invalid team ID" });
+    }
+
     const team = await prisma.team.findUnique({
       where: { id: teamId },
       include: {
@@ -114,35 +153,38 @@ exports.getTeamMembersLeaderboard = async (req, res) => {
       },
     });
 
-    if (!team) return res.status(404).json({ error: "Team not found" });
+    if (!team) {
+      return res.status(404).json({ error: "Team not found" });
+    }
 
     const leaderboard = team.members
-      .map((m) => {
-        const score = m.solved.reduce(
-          (sum, s) => sum + (s.challenge.points || 0),
+      .map((member) => {
+        const totalScore = member.solved.reduce(
+          (sum, entry) => sum + (entry.challenge.points || 0),
           0
         );
+
         return {
-          id: m.id,
-          username: m.username,
-          score,
-          solved: m.solved.length,
-          solves: m.solved.map((s) => ({
-            challenge: { id: s.challenge.id, points: s.challenge.points },
-            createdAt: s.createdAt,
+          id: member.id,
+          username: member.username,
+          score: totalScore,
+          solved: member.solved.length,
+          solves: member.solved.map((entry) => ({
+            challenge: { id: entry.challenge.id, points: entry.challenge.points },
+            createdAt: entry.createdAt,
           })),
         };
       })
       .sort((a, b) => b.score - a.score)
-      .map((u, i) => ({ rank: i + 1, ...u }));
+      .map((member, index) => ({ rank: index + 1, ...member }));
 
-    res.json({
+    return res.json({
       teamId: team.id,
       teamName: team.name,
       leaderboard,
     });
   } catch (err) {
-    console.error("❌ Team member leaderboard error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("Team member leaderboard error:", err);
+    return res.status(500).json({ error: "Failed to fetch team member leaderboard" });
   }
 };

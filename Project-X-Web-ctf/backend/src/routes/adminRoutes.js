@@ -1,6 +1,13 @@
-const express = require('express');
-const multer = require('multer');
-const { requireAdmin, authenticate } = require('../middlewares/auth');
+/**
+ * Admin Routes
+ * ------------
+ * Protected administrative endpoints for managing challenges and teams.
+ */
+
+const express = require("express");
+const multer = require("multer");
+const { authenticate, requireAdmin } = require("../middlewares/auth");
+
 const {
   createChallenge,
   updateChallenge,
@@ -10,41 +17,97 @@ const {
   getAllTeams,
   banTeam,
   unbanTeam,
-  reduceTeamScore
-} = require('../controllers/adminController');
+  reduceTeamScore,
+} = require("../controllers/adminController");
 
 const router = express.Router();
 
+/* -------------------------------------------------------------------------- */
+/*                                   Upload                                    */
+/* -------------------------------------------------------------------------- */
+
 const upload = multer({
-  dest: process.env.UPLOAD_DIR || 'uploads/',
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  dest: process.env.UPLOAD_DIR || "uploads/",
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
 });
 
-// 📜 List all challenges
-router.get('/challenges', authenticate, requireAdmin, getAllChallenges);
+/* -------------------------------------------------------------------------- */
+/*                               Challenge Routes                              */
+/* -------------------------------------------------------------------------- */
 
-// ➕ Create new challenge
-router.post('/challenge', authenticate, requireAdmin, upload.single('file'), createChallenge);
+/**
+ * List all challenges
+ * GET /api/admin/challenges
+ */
+router.get("/challenges", authenticate, requireAdmin, getAllChallenges);
 
-// ✏️ Update challenge
-router.put('/challenge/:id', authenticate, requireAdmin, upload.single('file'), updateChallenge);
+/**
+ * Create a new challenge
+ * POST /api/admin/challenge
+ */
+router.post(
+  "/challenge",
+  authenticate,
+  requireAdmin,
+  upload.single("file"),
+  createChallenge
+);
 
-// ❌ Delete challenge
-router.delete('/challenge/:id', authenticate, requireAdmin, deleteChallenge);
+/**
+ * Update a challenge
+ * PUT /api/admin/challenge/:id
+ */
+router.put(
+  "/challenge/:id",
+  authenticate,
+  requireAdmin,
+  upload.single("file"),
+  updateChallenge
+);
 
-// 🔁 Toggle release/stop
-router.patch('/challenge/:id/toggle', authenticate, requireAdmin, toggleRelease);
+/**
+ * Delete a challenge
+ * DELETE /api/admin/challenge/:id
+ */
+router.delete("/challenge/:id", authenticate, requireAdmin, deleteChallenge);
 
-// 🧑‍🤝‍🧑 Get all teams
-router.get('/teams', authenticate, requireAdmin, getAllTeams);
+/**
+ * Toggle release status
+ * PATCH /api/admin/challenge/:id/toggle
+ */
+router.patch(
+  "/challenge/:id/toggle",
+  authenticate,
+  requireAdmin,
+  toggleRelease
+);
 
-// 🚫 Ban team (temporary or permanent)
-router.post('/team/:id/ban', authenticate, requireAdmin, banTeam);
+/* -------------------------------------------------------------------------- */
+/*                                Team Routes                                  */
+/* -------------------------------------------------------------------------- */
 
-// ♻️ Unban team
-router.post('/team/:id/unban', authenticate, requireAdmin, unbanTeam);
+/**
+ * Get all teams with scoring details
+ * GET /api/admin/teams
+ */
+router.get("/teams", authenticate, requireAdmin, getAllTeams);
 
-// ⚖️ Apply penalty to team (reduce score)
-router.post('/team/:id/penalty', authenticate, requireAdmin, reduceTeamScore);
+/**
+ * Ban a team
+ * POST /api/admin/team/:id/ban
+ */
+router.post("/team/:id/ban", authenticate, requireAdmin, banTeam);
+
+/**
+ * Unban a team
+ * POST /api/admin/team/:id/unban
+ */
+router.post("/team/:id/unban", authenticate, requireAdmin, unbanTeam);
+
+/**
+ * Apply a score penalty to a team
+ * POST /api/admin/team/:id/penalty
+ */
+router.post("/team/:id/penalty", authenticate, requireAdmin, reduceTeamScore);
 
 module.exports = router;

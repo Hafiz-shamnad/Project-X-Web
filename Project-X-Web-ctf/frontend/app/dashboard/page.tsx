@@ -4,14 +4,12 @@ import React, { useEffect, useState } from "react";
 import {
   Terminal,
   Lock,
-  Unlock,
+  Shield,
   Flag,
   Trophy,
   Target,
   Zap,
-  Shield,
   ArrowLeft,
-  ArrowRight,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import FlagModal from "../components/FlagModal";
@@ -28,60 +26,118 @@ interface Challenge {
 }
 
 export default function ProjectXCTF() {
+  // ---------------------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------------------
+
   const [activeTab, setActiveTab] = useState<"challenges" | "leaderboard">(
     "challenges"
   );
+
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [solvedChallenges, setSolvedChallenges] = useState<number[]>([]);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(
     null
   );
+
   const [username, setUsername] = useState("");
   const [teamId, setTeamId] = useState<number | null>(null);
+
   const [flagModalOpen, setFlagModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const [bannedInfo, setBannedInfo] = useState<{
+    bannedUntil: string | null;
+  } | null>(null);
+
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
 
   const backendURL =
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
-  // 🧠 Fetch user info
+  // ---------------------------------------------------------------------------
+  // Fetch User Profile (Includes Ban Info)
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
-    const fetchUser = async () => {
+    const getUser = async () => {
       try {
         const res = await fetch(`${backendURL}/auth/me`, {
           credentials: "include",
         });
         const data = await res.json();
+
         if (data.user?.username) {
           setUsername(data.user.username);
           setTeamId(data.user.teamId ?? null);
+
+          setBannedInfo({
+            bannedUntil: data.user.bannedUntil,
+          });
         }
       } catch (err) {
-        console.error("⚠️ Error fetching user:", err);
+        console.error("Error fetching user:", err);
       }
     };
-    fetchUser();
+
+    getUser();
   }, [backendURL]);
 
-  // 🧩 Fetch Challenges
+  // ---------------------------------------------------------------------------
+  // Live Countdown for Temporary Ban
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!bannedInfo?.bannedUntil) return;
+
+    const bannedUntil = new Date(bannedInfo.bannedUntil).getTime();
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const diff = Math.max(0, Math.floor((bannedUntil - now) / 1000));
+      setRemainingSeconds(diff);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [bannedInfo]);
+
+  // Helper to format mm:ss
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
+
+  // ---------------------------------------------------------------------------
+  // Fetch Challenges + Team Solves
+  // ---------------------------------------------------------------------------
+
   const fetchChallenges = async () => {
     try {
-      const challengeRes = await fetch(`${backendURL}/challenges`, {
+      const res = await fetch(`${backendURL}/challenges`, {
         credentials: "include",
       });
-      const challengeData: Challenge[] = await challengeRes.json();
-      setChallenges(challengeData.filter((c) => c.released));
 
-      const solveRes = await fetch(`${backendURL}/team/${teamId}/solves`, {
-        credentials: "include",
-      });
-      const solveData = await solveRes.json();
-      const solvedIds =
-        solveData?.solved?.map((s: { challengeId: number }) => s.challengeId) ||
-        [];
-      setSolvedChallenges(solvedIds);
+      const data: Challenge[] = await res.json();
+      setChallenges(data.filter((c) => c.released));
+
+      if (teamId) {
+        const solvedRes = await fetch(`${backendURL}/team/${teamId}/solves`, {
+          credentials: "include",
+        });
+        const solvedData = await solvedRes.json();
+
+        setSolvedChallenges(
+          solvedData?.solved?.map(
+            (s: { challengeId: number }) => s.challengeId
+          ) || []
+        );
+      }
     } catch (err) {
-      console.error("❌ Error fetching challenges:", err);
+      console.error("Error loading challenges:", err);
     } finally {
       setLoading(false);
     }
@@ -90,6 +146,25 @@ export default function ProjectXCTF() {
   useEffect(() => {
     if (username) fetchChallenges();
   }, [username]);
+
+  // ---------------------------------------------------------------------------
+  // Ban Rendering Conditions (after all hooks)
+  // ---------------------------------------------------------------------------
+
+  // Temporary ban active
+  const isTempBanned =
+    bannedInfo?.bannedUntil &&
+    bannedInfo.bannedUntil !== "PERMANENT" &&
+    new Date(bannedInfo.bannedUntil) > new Date() &&
+    remainingSeconds !== null &&
+    remainingSeconds > 0;
+
+  // Permanent ban (null means permanent)
+  const isPermanentBanned = bannedInfo?.bannedUntil === "PERMANENT";
+
+  // ---------------------------------------------------------------------------
+  // Difficulty Color Helper
+  // ---------------------------------------------------------------------------
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -104,6 +179,10 @@ export default function ProjectXCTF() {
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Loading Screen
+  // ---------------------------------------------------------------------------
+
   if (loading)
     return (
       <div className="flex items-center justify-center min-h-screen bg-black text-green-500">
@@ -111,18 +190,69 @@ export default function ProjectXCTF() {
       </div>
     );
 
+  // ---------------------------------------------------------------------------
+  // Temporary Ban UI
+  // ---------------------------------------------------------------------------
+
+  if (isTempBanned) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-black text-red-400 font-mono">
+        <Shield className="w-16 h-16 text-red-500 mb-4 animate-pulse" />
+        <h1 className="text-3xl font-bold mb-2">Team Temporarily Banned</h1>
+        <p className="text-lg mb-4">
+          You may continue after the following time:
+        </p>
+
+        <div className="text-6xl font-bold text-red-300 mb-6">
+          {formatTime(remainingSeconds)}
+        </div>
+
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-2 border border-red-500 rounded-lg hover:bg-red-500 hover:text-black transition"
+        >
+          Refresh
+        </button>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Permanent Ban UI
+  // ---------------------------------------------------------------------------
+
+  if (isPermanentBanned) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-black text-red-400 font-mono">
+        <Lock className="w-16 h-16 text-red-600 mb-4 animate-pulse" />
+        <h1 className="text-3xl font-bold mb-2">Team Permanently Banned</h1>
+        <p className="text-lg mb-6">Please contact an administrator.</p>
+
+        <button
+          onClick={() => (window.location.href = "/contact-admin")}
+          className="px-6 py-2 border border-red-500 rounded-lg hover:bg-red-500 hover:text-black transition"
+        >
+          Contact Admin
+        </button>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Main CTF UI
+  // ---------------------------------------------------------------------------
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-950 text-green-400 font-mono">
       <Toaster position="top-right" />
 
-      {/* HEADER */}
+      {/* Header */}
       <header className="flex items-center justify-between px-6 py-5 border-b border-green-500/30 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <Shield className="w-8 h-8 text-green-400" />
-          <h1 className="text-2xl font-bold text-green-400">
-            PROJECT_X CTF ARENA
-          </h1>
+          <h1 className="text-2xl font-bold">PROJECT_X CTF ARENA</h1>
         </div>
+
         <div className="flex gap-3 text-sm">
           <button
             onClick={() => setActiveTab("challenges")}
@@ -134,6 +264,7 @@ export default function ProjectXCTF() {
           >
             <Target className="inline w-4 h-4 mr-1" /> Challenges
           </button>
+
           <button
             onClick={() => setActiveTab("leaderboard")}
             className={`px-5 py-2 rounded-md font-semibold transition-all ${
@@ -147,10 +278,10 @@ export default function ProjectXCTF() {
         </div>
       </header>
 
-      {/* 💻 LAYOUT */}
+      {/* Layout for Challenges / Leaderboard */}
       {activeTab === "challenges" ? (
         <main className="flex flex-col md:flex-row h-[calc(100vh-80px)] overflow-hidden">
-          {/* LEFT: Challenge List */}
+          {/* Left Sidebar */}
           <aside className="md:w-1/3 lg:w-1/4 bg-gray-950 border-r border-green-500/20 overflow-y-auto no-scrollbar">
             <div className="p-4 border-b border-green-500/20">
               <h2 className="text-lg font-bold text-green-400 flex items-center gap-2">
@@ -179,10 +310,11 @@ export default function ProjectXCTF() {
                       {c.difficulty}
                     </span>
                   </div>
+
                   <div className="text-sm text-gray-500 flex items-center gap-2 mt-1">
                     <Zap className="w-3 h-3" /> {c.points} pts
                     {solvedChallenges.includes(c.id) && (
-                      <span className="text-green-500 text-xs">✓ Solved</span>
+                      <span className="text-green-500 text-xs">Solved</span>
                     )}
                   </div>
                 </button>
@@ -190,7 +322,7 @@ export default function ProjectXCTF() {
             </div>
           </aside>
 
-          {/* RIGHT: Challenge Detail */}
+          {/* Right Panel */}
           <section className="flex-1 p-6 overflow-y-auto backdrop-blur-sm">
             {selectedChallenge ? (
               <div className="bg-gray-900/60 border border-green-500/30 rounded-xl p-8 shadow-lg backdrop-blur-lg h-full">
@@ -207,9 +339,9 @@ export default function ProjectXCTF() {
                   </span>
                 </div>
 
-                <div className="text-gray-400 text-sm mb-6">
-                  <p>{selectedChallenge.description}</p>
-                </div>
+                <p className="text-gray-400 text-sm mb-6">
+                  {selectedChallenge.description}
+                </p>
 
                 <div className="flex items-center justify-between text-sm text-gray-500 mb-6">
                   <div className="flex items-center gap-2">
@@ -224,15 +356,15 @@ export default function ProjectXCTF() {
 
                 <button
                   onClick={() => setFlagModalOpen(true)}
+                  disabled={solvedChallenges.includes(selectedChallenge.id)}
                   className={`px-6 py-3 rounded-md font-bold text-black transition-all ${
                     solvedChallenges.includes(selectedChallenge.id)
                       ? "bg-green-500 cursor-not-allowed"
                       : "bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400"
                   }`}
-                  disabled={solvedChallenges.includes(selectedChallenge.id)}
                 >
                   {solvedChallenges.includes(selectedChallenge.id)
-                    ? "✔ Already Solved"
+                    ? "Already Solved"
                     : "Submit Flag"}
                 </button>
               </div>
@@ -250,16 +382,16 @@ export default function ProjectXCTF() {
         </div>
       )}
 
-      {/* FLAG MODAL */}
+      {/* Flag Modal */}
       <FlagModal
         open={flagModalOpen}
         onClose={() => setFlagModalOpen(false)}
         onSuccess={async (data) => {
           if (data.status === "correct") {
-            toast.success("Correct Flag! 🏆");
+            toast.success("Correct flag submitted");
             fetchChallenges();
           } else {
-            toast.error("Wrong flag. Try again.");
+            toast.error("Incorrect flag");
           }
         }}
         username={username}

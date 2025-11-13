@@ -1,5 +1,21 @@
 "use client";
 
+/**
+ * Leaderboard Component
+ * ----------------------
+ * Displays a real-time leaderboard and score progression timeline chart.
+ *
+ * Features:
+ * - Fetches team or global leaderboard depending on teamId.
+ * - Builds cumulative score timeline for the top 10 entries.
+ * - Renders a Recharts LineChart with responsive design.
+ * - Auto-refreshes every 60 seconds.
+ *
+ * Environment:
+ * - Client-side React component (Next.js “use client”)
+ * - Uses Recharts for visualization
+ */
+
 import React, { useEffect, useState } from "react";
 import {
   LineChart,
@@ -13,17 +29,30 @@ import {
 } from "recharts";
 import { LineChart as ChartIcon, Flag } from "lucide-react";
 
+/* -------------------------------------------------------------------------- */
+/*                              Type Definitions                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Represents a point on the cumulative score timeline.
+ */
 interface TimelinePoint {
   time: number;
   score: number;
   label: string;
 }
 
+/**
+ * Represents a challenge solve event.
+ */
 interface Solve {
   challenge: { points: number };
   createdAt: string;
 }
 
+/**
+ * Represents a single leaderboard entry (team or member).
+ */
 type TeamData = {
   id?: number;
   username?: string;
@@ -33,10 +62,17 @@ type TeamData = {
   solves?: Solve[];
 };
 
+/**
+ * Props accepted by Leaderboard component.
+ */
 interface LeaderboardProps {
   backendUrl: string;
   teamId?: number | null;
 }
+
+/* -------------------------------------------------------------------------- */
+/*                             Component Definition                            */
+/* -------------------------------------------------------------------------- */
 
 export default function Leaderboard({
   backendUrl,
@@ -48,6 +84,10 @@ export default function Leaderboard({
   >({});
   const [loading, setLoading] = useState(true);
 
+  /**
+   * Fixed color palette used to differentiate chart lines.
+   * Cycling ensures more than 10 entries won’t break styling.
+   */
   const teamColors = [
     "#00FF88",
     "#00FFFF",
@@ -61,9 +101,19 @@ export default function Leaderboard({
     "#33FFAA",
   ];
 
+  /* -------------------------------------------------------------------------- */
+  /*                         Leaderboard Fetching Logic                         */
+  /* -------------------------------------------------------------------------- */
+
+  /**
+   * Fetches leaderboard data from backend.
+   * Normalizes API differences and extracts relevant fields.
+   */
+
   const fetchLeaderboard = async () => {
     try {
       setLoading(true);
+
       const url = teamId
         ? `${backendUrl}/leaderboard/team/${teamId}`
         : `${backendUrl}/leaderboard/teams`;
@@ -71,6 +121,7 @@ export default function Leaderboard({
       const res = await fetch(url, { credentials: "include" });
       const data = await res.json();
 
+      // Determine correct structure (backend may send leaderboard[], teams[], or raw [])
       const entries: TeamData[] = Array.isArray(data)
         ? data
         : Array.isArray(data.leaderboard)
@@ -79,7 +130,8 @@ export default function Leaderboard({
         ? data.teams
         : [];
 
-      const normalized: TeamData[] = entries.map((item: any) => ({
+      // Normalize data shape
+      const normalized = entries.map((item: any) => ({
         id: item.id,
         username: item.username ?? undefined,
         teamName: item.teamName ?? data.teamName ?? "Unknown Team",
@@ -90,20 +142,28 @@ export default function Leaderboard({
 
       setLeaderboard(normalized);
 
-      // Build timeline for top 10
+      /* ---------------------------------------------------------------------- */
+      /*                         Timeline Data Processing                       */
+      /* ---------------------------------------------------------------------- */
+
       const top = normalized.slice(0, 10);
       const timelines: Record<string, TimelinePoint[]> = {};
 
       for (const member of top) {
         const label = member.username || member.teamName || "Unknown";
-        const sortedSolves = (member.solves ?? []).sort(
-          (a, b) =>
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        );
+
+        /**
+         * Sorts solve entries by timestamp (oldest → newest).
+         */
+        const sortByCreatedAt = (a: Solve, b: Solve): number =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+
+        const sortedSolves = (member.solves ?? []).sort(sortByCreatedAt);
 
         let cumulative = 0;
         const points: TimelinePoint[] = [];
 
+        // Build cumulative score points
         for (const solve of sortedSolves) {
           cumulative += solve.challenge?.points || 0;
           points.push({
@@ -113,10 +173,10 @@ export default function Leaderboard({
           });
         }
 
-        // Add starting point
+        // Add baseline or fallback point
         if (points.length) {
           points.unshift({
-            time: points[0].time - 60_000,
+            time: points[0].time - 60000, // start slightly earlier
             score: 0,
             label,
           });
@@ -139,11 +199,19 @@ export default function Leaderboard({
     }
   };
 
+  /* -------------------------------------------------------------------------- */
+  /*                          Auto-Refresh & Initial Load                       */
+  /* -------------------------------------------------------------------------- */
+
   useEffect(() => {
     fetchLeaderboard();
-    const interval = setInterval(fetchLeaderboard, 60000); // auto-refresh every 1 min
+    const interval = setInterval(fetchLeaderboard, 60000); // refresh every 1 min
     return () => clearInterval(interval);
   }, [teamId]);
+
+  /* -------------------------------------------------------------------------- */
+  /*                             Loading Placeholder                            */
+  /* -------------------------------------------------------------------------- */
 
   if (loading) {
     return (
@@ -154,9 +222,13 @@ export default function Leaderboard({
     );
   }
 
+  /* -------------------------------------------------------------------------- */
+  /*                              Component Markup                               */
+  /* -------------------------------------------------------------------------- */
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
-      {/* SCORE GROWTH CHART */}
+      {/* ----------------------------- SCORE TIMELINE ----------------------------- */}
       <div className="bg-gradient-to-br from-black via-gray-900 to-black border border-green-500/40 rounded-xl p-6 mb-8 shadow-lg shadow-green-500/10">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-bold text-green-300 flex items-center gap-2">
@@ -168,6 +240,7 @@ export default function Leaderboard({
         <ResponsiveContainer width="100%" height={400}>
           <LineChart margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
+
             <XAxis
               dataKey="time"
               type="number"
@@ -180,7 +253,9 @@ export default function Leaderboard({
               }
               stroke="#888"
             />
+
             <YAxis stroke="#888" />
+
             <Tooltip
               labelFormatter={(v) =>
                 new Date(v).toLocaleTimeString([], {
@@ -196,8 +271,10 @@ export default function Leaderboard({
                 color: "#0f0",
               }}
             />
+
             <Legend />
 
+            {/* Render timeline lines */}
             {Object.entries(timelineData).map(([label, data], idx) => (
               <Line
                 key={label}
@@ -230,7 +307,7 @@ export default function Leaderboard({
         </p>
       </div>
 
-      {/* LEADERBOARD TABLE */}
+      {/* ----------------------------- LEADERBOARD LIST ----------------------------- */}
       <div className="bg-gradient-to-br from-black via-gray-900 to-black border border-green-500/40 rounded-xl overflow-hidden">
         <div className="bg-green-950/30 px-6 py-4 border-b border-green-500/30">
           <h3 className="text-xl font-bold text-green-300">
@@ -246,6 +323,7 @@ export default function Leaderboard({
               key={item.id ?? idx}
               className="px-6 py-4 flex items-center justify-between border-b border-gray-800 hover:bg-green-950/10 transition-all duration-200"
             >
+              {/* Rank + Team Name */}
               <div className="flex items-center space-x-6">
                 <span
                   className={`text-2xl font-bold w-8 ${
@@ -260,10 +338,12 @@ export default function Leaderboard({
                 >
                   #{idx + 1}
                 </span>
+
                 <div>
                   <div className="font-bold text-white text-lg">
                     {item.username || item.teamName}
                   </div>
+
                   <div className="text-sm text-green-300 flex items-center gap-1">
                     <Flag className="w-3 h-3" />
                     {item.solved} challenges solved
@@ -271,6 +351,7 @@ export default function Leaderboard({
                 </div>
               </div>
 
+              {/* Score */}
               <div className="text-right">
                 <div className="text-2xl font-bold text-green-500">
                   {item.score}

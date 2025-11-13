@@ -1,14 +1,40 @@
-const express = require('express');
+/**
+ * Leaderboard Routes
+ * -------------------
+ * Handles:
+ *  - Global user leaderboard
+ *  - Global team leaderboard
+ *  - Team-specific member leaderboard
+ */
+
+const express = require("express");
 const router = express.Router();
-const leaderboardController = require('../controllers/leaderboardController');
+const {
+  getLeaderboard,
+  getTeamLeaderboard,
+  getTeamMembersLeaderboard,
+} = require("../controllers/leaderboardController");
 
-// 🌍 Global User Leaderboard
-router.get('/', leaderboardController.getLeaderboard);
+/* -------------------------------------------------------------------------- */
+/*                                   Routes                                    */
+/* -------------------------------------------------------------------------- */
 
-// 🏆 Team Leaderboard
-router.get('/teams', leaderboardController.getTeamLeaderboard);
+/**
+ * Global user leaderboard
+ * GET /api/leaderboard
+ */
+router.get("/", getLeaderboard);
 
-// 👥 Team Member Leaderboard (specific team)
-router.get('/team/:id', leaderboardController.getTeamMembersLeaderboard);
+/**
+ * Global team leaderboard
+ * GET /api/leaderboard/teams
+ */
+router.get("/teams", getTeamLeaderboard);
+
+/**
+ * Team-specific internal leaderboard
+ * GET /api/leaderboard/team/:id
+ */
+router.get("/team/:id", getTeamMembersLeaderboard);
 
 module.exports = router;

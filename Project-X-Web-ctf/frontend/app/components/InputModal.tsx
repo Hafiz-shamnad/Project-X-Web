@@ -1,9 +1,12 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 
+//
+// Types
+//
 interface InputModalProps {
   isOpen: boolean;
   title?: string;
@@ -17,6 +20,16 @@ interface InputModalProps {
   onCancel: () => void;
 }
 
+/**
+ * InputModal
+ * ----------
+ * Generic modal component that captures user input.
+ * Features:
+ *  - Fully SSR-safe in Next.js using client portal mount guards
+ *  - Smooth presence animations
+ *  - Reusable across admin prompts, penalty input, ban duration, etc.
+ *  - Accessible design with role="dialog"
+ */
 export default function InputModal({
   isOpen,
   title = 'Enter Value',
@@ -30,53 +43,90 @@ export default function InputModal({
   onCancel,
 }: InputModalProps) {
   const [value, setValue] = useState('');
+  const [mounted, setMounted] = useState(false);
 
-  // Reset input when modal opens/closes
+  // Ensure portal only mounts on client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Reset input when modal closes
   useEffect(() => {
     if (!isOpen) setValue('');
   }, [isOpen]);
 
-  if (typeof window === 'undefined') return null;
+  if (!mounted) return null;
 
   return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="input-modal-title"
+          aria-describedby="input-modal-message"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          onClick={(e) => e.target === e.currentTarget && onCancel()}
         >
           <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
+            className="bg-gray-900 border border-green-500 p-7 rounded-xl shadow-lg max-w-sm w-full"
+            initial={{ scale: 0.85, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            className="bg-gray-900 border border-green-500 p-8 rounded-xl text-center shadow-lg max-w-sm w-full"
+            exit={{ scale: 0.85, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 180, damping: 20 }}
           >
-            <h3 className="text-xl font-bold mb-3 text-green-400">{title}</h3>
-            <p className="text-green-300 mb-4">{message}</p>
+            {/* Title */}
+            <h3
+              id="input-modal-title"
+              className="text-xl font-semibold mb-3 text-green-400"
+            >
+              {title}
+            </h3>
 
-            <label className="block text-left text-sm text-green-400 mb-2">{label}</label>
+            {/* Message */}
+            <p
+              id="input-modal-message"
+              className="text-green-300 text-sm mb-5 leading-relaxed"
+            >
+              {message}
+            </p>
+
+            {/* Input Field */}
+            <label className="block text-sm text-green-400 mb-2">
+              {label}
+            </label>
             <input
               type={inputType}
               value={value}
-              placeholder={placeholder}
               onChange={(e) => setValue(e.target.value)}
-              className="w-full p-2 bg-gray-800 text-white border border-green-500 rounded mb-6 focus:outline-none focus:ring-2 focus:ring-green-400"
+              placeholder={placeholder}
+              className="
+                w-full p-3 bg-gray-800 text-white text-sm rounded border border-green-500
+                focus:outline-none focus:ring-2 focus:ring-green-400
+              "
             />
 
-            <div className="flex justify-center space-x-4">
-              <button
-                onClick={() => onConfirm(value)}
-                className="bg-green-500 text-black px-5 py-2 rounded font-bold hover:bg-green-400 transition"
-              >
-                {confirmText}
-              </button>
+            {/* Actions */}
+            <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={onCancel}
-                className="bg-gray-700 text-green-400 px-5 py-2 rounded font-bold hover:bg-gray-600 transition"
+                className="px-4 py-2 rounded text-green-300 bg-gray-700 hover:bg-gray-600 transition"
               >
                 {cancelText}
+              </button>
+
+              <button
+                onClick={() => onConfirm(value)}
+                disabled={!value.trim()}
+                className="
+                  px-5 py-2 rounded font-semibold text-black bg-green-500
+                  hover:bg-green-400 transition disabled:opacity-60 disabled:cursor-not-allowed
+                "
+              >
+                {confirmText}
               </button>
             </div>
           </motion.div>
