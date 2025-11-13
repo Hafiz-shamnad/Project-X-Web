@@ -1,96 +1,96 @@
-// prisma/seed.js
-// Usage:
-//   1) Ensure FLAG_SALT is set in your project root .env
-//   2) Run: node prisma/seed.js
-//    or: npx prisma db seed  (if prisma is configured to run this file)
-//
-// Notes:
-// - This script expects that plaintext flags are present in the 'flag' field of each challenge.
-// - After verifying seeded challenges, consider removing plaintext flags from DB.
+/**
+ * Prisma Seed Script
+ * ------------------
+ * Usage:
+ *   - Ensure FLAG_SALT is defined in the project root .env file.
+ *   - Run using:
+ *       node prisma/seed.js
+ *       or
+ *       npx prisma db seed
+ *
+ * Notes:
+ *   - The script expects plaintext flags in the "flag" field of each seed entry.
+ *   - After verification, consider removing plaintext flags from seed data.
+ */
 
-const path = require('path');
-const dotenv = require('dotenv');
-const { PrismaClient } = require('@prisma/client');
-const crypto = require('crypto');
+const path = require("path");
+const dotenv = require("dotenv");
+const crypto = require("crypto");
+const { PrismaClient } = require("@prisma/client");
 
-//
-// Force-load .env from project root (safe even if Prisma auto-loads env)
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+// Load environment variables from project root
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const prisma = new PrismaClient();
-const FLAG_SALT = process.env.FLAG_SALT || '';
+const FLAG_SALT = process.env.FLAG_SALT || "";
 
-if (!FLAG_SALT) {
-  console.warn(
-    '⚠️  FLAG_SALT is not set. You should set FLAG_SALT in your .env before seeding to use salted hashes.'
-  );
-}
-
+/**
+ * Compute a salted SHA-256 hash of a plaintext flag.
+ */
 function hashFlag(flag) {
-  if (typeof flag !== 'string') flag = String(flag || '');
-  const canonical = flag.trim();
-  return crypto.createHash('sha256').update(FLAG_SALT + canonical).digest('hex');
+  const value = typeof flag === "string" ? flag.trim() : String(flag || "");
+  return crypto.createHash("sha256").update(FLAG_SALT + value).digest("hex");
 }
 
 async function main() {
-  console.log('🔐 Starting prisma seed (salted flags) ...');
-  console.log(`🧂 FLAG_SALT loaded?: ${FLAG_SALT ? 'yes' : 'no'}`);
-  console.log('');
+  console.log("Starting Prisma seed process (salted flag hashes).");
+  console.log(`FLAG_SALT provided: ${FLAG_SALT ? "yes" : "no"}`);
+  console.log("");
 
   const challenges = [
     {
-      name: 'Web Exploit 101',
-      category: 'Web',
-      difficulty: 'Easy',
+      name: "Web Exploit 101",
+      category: "Web",
+      difficulty: "Easy",
       points: 100,
-      description: 'Find the hidden flag in the vulnerable web application',
-      flag: 'FLAG{web_exploit_101}',
+      description: "Find the hidden flag in the vulnerable web application.",
+      flag: "FLAG{web_exploit_101}",
     },
     {
-      name: 'SQL Injection Master',
-      category: 'Web',
-      difficulty: 'Medium',
+      name: "SQL Injection Master",
+      category: "Web",
+      difficulty: "Medium",
       points: 250,
-      description: 'Bypass authentication using SQL injection techniques',
-      flag: 'FLAG{sql_mastery}',
+      description: "Bypass authentication using SQL injection techniques.",
+      flag: "FLAG{sql_mastery}",
     },
     {
-      name: 'Cryptic Messages',
-      category: 'Crypto',
-      difficulty: 'Medium',
+      name: "Cryptic Messages",
+      category: "Crypto",
+      difficulty: "Medium",
       points: 300,
-      description: 'Decrypt the encoded message to reveal the flag',
-      flag: 'FLAG{cryptic_msg}',
+      description: "Decrypt the encoded message to reveal the flag.",
+      flag: "FLAG{cryptic_msg}",
     },
     {
-      name: 'Binary Exploitation',
-      category: 'PWN',
-      difficulty: 'Hard',
+      name: "Binary Exploitation",
+      category: "PWN",
+      difficulty: "Hard",
       points: 500,
-      description: 'Exploit the buffer overflow vulnerability',
-      flag: 'FLAG{pwn_overflow}',
+      description: "Exploit the buffer overflow vulnerability.",
+      flag: "FLAG{pwn_overflow}",
     },
     {
-      name: 'Reverse Engineering',
-      category: 'Reverse',
-      difficulty: 'Hard',
+      name: "Reverse Engineering",
+      category: "Reverse",
+      difficulty: "Hard",
       points: 450,
-      description: 'Analyze the binary and extract the hidden flag',
-      flag: 'FLAG{rev_engineer}',
+      description: "Analyze the binary and extract the hidden flag.",
+      flag: "FLAG{rev_engineer}",
     },
     {
-      name: 'Network Forensics',
-      category: 'Forensics',
-      difficulty: 'Easy',
+      name: "Network Forensics",
+      category: "Forensics",
+      difficulty: "Easy",
       points: 150,
-      description: 'Analyze the packet capture file',
-      flag: 'FLAG{net_forensics}',
+      description: "Analyze the packet capture file.",
+      flag: "FLAG{net_forensics}",
     },
   ];
 
   for (const ch of challenges) {
     if (!ch.flag) {
-      console.warn(`⚠️  Skipping "${ch.name}" — no plaintext flag provided in seed entry.`);
+      console.warn(`Skipping "${ch.name}" — no plaintext flag provided.`);
       continue;
     }
 
@@ -115,25 +115,25 @@ async function main() {
       },
     });
 
-    console.log(`✅ Upserted: ${ch.name} — flagHash: ${hashed.slice(0, 8)}...`);
+    console.log(`Upserted challenge: ${ch.name} (hash prefix: ${hashed.slice(0, 8)}...)`);
   }
 
-  // optional: seed a test user if not present
+  // Optional seed user
   await prisma.user.upsert({
-    where: { username: 'H4ck3rPr0' },
+    where: { username: "H4ck3rPr0" },
     update: {},
-    create: { username: 'H4ck3rPr0' },
+    create: { username: "H4ck3rPr0", passwordHash: "" },
   });
 
-  console.log('\n🎉 Seed finished. Verify the challenges and then consider removing plaintext flags from DB.');
+  console.log("\nSeed process completed. Review the data and consider removing plaintext flags.");
 }
 
 main()
   .catch((err) => {
-    console.error('❌ Seed error:', err);
+    console.error("Seed error:", err);
     process.exitCode = 1;
   })
   .finally(async () => {
     await prisma.$disconnect();
-    console.log('🔌 Prisma disconnected.');
+    console.log("Prisma client disconnected.");
   });

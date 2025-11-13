@@ -1,3 +1,7 @@
+// ---------------------------------------------------------------------------
+// Datasource & Generator
+// ---------------------------------------------------------------------------
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -7,84 +11,101 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
 model Challenge {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique
+  id          Int         @id @default(autoincrement())
+  name        String      @unique
   category    String
   difficulty  String
   points      Int
   description String
-  flagHash    String?        // hashed (FLAG_SALT + flag) stored
-  filePath    String?        // optional uploaded file path
-  createdAt   DateTime @default(now())
-  released    Boolean  @default(false) 
-  eventId     Int? 
-  event       Event?   @relation(fields: [eventId], references: [id])
+  flagHash    String?              // hashed flag (FLAG_SALT + flag)
+  filePath    String?              // optional file storage path
+  createdAt   DateTime   @default(now())
+  released    Boolean    @default(false)
+
+  eventId     Int?
+  event       Event?     @relation(fields: [eventId], references: [id])
+
   solvedBy    Solved[]
-  attempts     Attempt[] 
+  attempts    Attempt[]
 }
 
 model User {
-  id           Int       @id @default(autoincrement())
-  username     String    @unique
-  email        String?   @unique
+  id           Int        @id @default(autoincrement())
+  username     String     @unique
+  email        String?    @unique
   passwordHash String
-  role         String    @default("user") // 'user' | 'admin'
-  createdAt    DateTime  @default(now())
-  attempts     Attempt[] // optional attempt logs
-  teamId        Int?      // ✅ user can belong to one team
-  team          Team?     @relation("TeamMembers", fields: [teamId], references: [id])
-  solved       Solved[]  @relation("UserSolves")
-  bio          String?   @default("Cybersecurity enthusiast.")
-  country      String?   @default("Unknown")
-  avatarUrl    String?   @default("/default-avatar.png")
+  role         String     @default("user")
+  createdAt    DateTime   @default(now())
+
+  teamId       Int?
+  team         Team?      @relation("TeamMembers", fields: [teamId], references: [id])
+
+  attempts     Attempt[]
+  solved       Solved[]   @relation("UserSolves")
+
+  bio          String?    @default("Cybersecurity enthusiast.")
+  country      String?    @default("Unknown")
+  avatarUrl    String?    @default("/default-avatar.png")
 }
 
 model Solved {
-  id           Int       @id @default(autoincrement())
-  user         User     @relation("UserSolves", fields: [userId], references: [id])
-  userId       Int
-  challenge    Challenge @relation(fields: [challengeId], references: [id])
-  challengeId  Int
-  solvedAt     DateTime  @default(now())
-  teamId       Int? 
-  team         Team?    @relation("TeamSolves", fields: [teamId], references: [id])
-  points       Int      @default(0) 
+  id           Int        @id @default(autoincrement())
 
-  createdAt    DateTime @default(now())
+  userId       Int
+  user         User       @relation("UserSolves", fields: [userId], references: [id])
+
+  challengeId  Int
+  challenge    Challenge  @relation(fields: [challengeId], references: [id])
+
+  teamId       Int?
+  team         Team?      @relation("TeamSolves", fields: [teamId], references: [id])
+
+  points       Int        @default(0)
+  solvedAt     DateTime   @default(now())
+  createdAt    DateTime   @default(now())
+
   @@unique([userId, challengeId])
 }
 
 model Attempt {
-  id           Int      @id @default(autoincrement())
+  id           Int        @id @default(autoincrement())
   userId       Int?
   challengeId  Int?
-  attemptAt    DateTime @default(now())
+  attemptAt    DateTime   @default(now())
   ip           String?
   correct      Boolean
-  user         User?      @relation(fields: [userId], references: [id])
-  challenge    Challenge? @relation(fields: [challengeId], references: [id])
+
+  user         User?       @relation(fields: [userId], references: [id])
+  challenge    Challenge?  @relation(fields: [challengeId], references: [id])
 }
 
 model Event {
-  id          Int       @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   name        String
-  slug        String    @unique
+  slug        String      @unique
   description String?
   startAt     DateTime
   endAt       DateTime
-  freezeAt    DateTime?  // optional freeze time for leaderboard
-  createdAt   DateTime @default(now())
+  freezeAt    DateTime?    // optional leaderboard freeze time
+  createdAt   DateTime     @default(now())
+
   challenges  Challenge[]
 }
 
 model Team {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  joinCode  String    @unique
-  createdAt DateTime  @default(now())
-  bannedUntil  DateTime? // ⏰ for timeout bans
-  penaltyPoints Int?     @default(0)
-  members   User[]    @relation("TeamMembers")
-  solved    Solved[]  @relation("TeamSolves")
+  id            Int        @id @default(autoincrement())
+  name          String     @unique
+  joinCode      String     @unique
+  createdAt     DateTime   @default(now())
+
+  bannedUntil   DateTime?
+  penaltyPoints Int        @default(0)
+
+  members       User[]     @relation("TeamMembers")
+  solved        Solved[]   @relation("TeamSolves")
 }
