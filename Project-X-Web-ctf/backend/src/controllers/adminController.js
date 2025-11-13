@@ -262,8 +262,10 @@ exports.banTeam = async (req, res) => {
     let bannedUntil;
 
     if (durationMinutes === 0) {
-      bannedUntil = "PERMANENT";
+      // Permanent ban → store far-future date
+      bannedUntil = new Date("9999-12-31T23:59:59Z");
     } else if (durationMinutes > 0) {
+      // Temporary ban
       bannedUntil = new Date(Date.now() + durationMinutes * 60 * 1000);
     } else {
       return res.status(400).json({ error: "Invalid ban duration" });
@@ -281,11 +283,13 @@ exports.banTeam = async (req, res) => {
           ? "Team permanently banned"
           : `Team banned for ${durationMinutes} minutes`,
     });
+
   } catch (err) {
     console.error("Error banning team:", err);
     return res.status(500).json({ error: "Failed to ban team" });
   }
 };
+
 
 /* -------------------------------------------------------------------------- */
 /*                                 Unban Team                                  */

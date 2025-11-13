@@ -147,20 +147,26 @@ export default function ProjectXCTF() {
     if (username) fetchChallenges();
   }, [username]);
 
-  // ---------------------------------------------------------------------------
-  // Ban Rendering Conditions (after all hooks)
-  // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Ban Rendering Conditions (after all hooks)
+// ---------------------------------------------------------------------------
 
-  // Temporary ban active
-  const isTempBanned =
-    bannedInfo?.bannedUntil &&
-    bannedInfo.bannedUntil !== "PERMANENT" &&
-    new Date(bannedInfo.bannedUntil) > new Date() &&
-    remainingSeconds !== null &&
-    remainingSeconds > 0;
+const bannedUntil = bannedInfo?.bannedUntil
+  ? new Date(bannedInfo.bannedUntil)
+  : null;
 
-  // Permanent ban (null means permanent)
-  const isPermanentBanned = bannedInfo?.bannedUntil === "PERMANENT";
+// Permanent ban (far future timestamp)
+const isPermanentBanned =
+  bannedUntil && bannedUntil.getFullYear() >= 9999;
+
+// Temporary ban active
+const isTempBanned =
+  bannedUntil &&
+  !isPermanentBanned &&
+  bannedUntil.getTime() > Date.now() &&
+  remainingSeconds !== null &&
+  remainingSeconds > 0;
+
 
   // ---------------------------------------------------------------------------
   // Difficulty Color Helper
