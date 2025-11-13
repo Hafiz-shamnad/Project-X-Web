@@ -29,7 +29,7 @@ exports.getMyProfile = async (req, res) => {
       where: { id: userId },
       include: {
         team: true,
-        solves: {
+        solved: {
           include: { challenge: true },
           orderBy: { id: "desc" },
         },
@@ -40,7 +40,7 @@ exports.getMyProfile = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const totalPoints = user.solves.reduce(
+    const totalPoints = user.solved.reduce(
       (sum, s) => sum + (s.challenge?.points || 0),
       0
     );
@@ -52,7 +52,7 @@ exports.getMyProfile = async (req, res) => {
       country: user.country,
       team: user.team ? { id: user.team.id, name: user.team.name } : null,
       totalPoints,
-      challengesSolved: user.solves.map((s) => ({
+      challengesSolved: user.solved.map((s) => ({
         id: s.challenge.id,
         name: s.challenge.name,
         category: s.challenge.category,
