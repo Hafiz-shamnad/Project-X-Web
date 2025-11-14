@@ -1,41 +1,29 @@
-/**
- * Challenge Routes
- * ----------------
- * Handles:
- *  - Fetching all challenges
- *  - Fetching public released challenges
- *  - Fetching individual challenge details
- */
-
 const express = require("express");
 const {
   getChallengeById,
   getChallenges,
   getPublicChallenges,
+  startChallenge,
+  stopChallenge,
+  getChallengeInstance,
+  spawnChallengeInstance
 } = require("../controllers/challengeController");
 
 const router = express.Router();
 
-/* -------------------------------------------------------------------------- */
-/*                                Public Routes                                */
-/* -------------------------------------------------------------------------- */
+/* ------------------- Instance Routes MUST come FIRST ------------------- */
+router.get("/instance/:id", getChallengeInstance);
+router.post("/spawn/:id", spawnChallengeInstance);
 
-/**
- * Get all public released challenges
- * GET /api/challenges/public
- */
+/* ----------------------------- Public Routes ---------------------------- */
 router.get("/public", getPublicChallenges);
-
-/**
- * Get all challenges (admin or internal use depending on controller behavior)
- * GET /api/challenges
- */
 router.get("/", getChallenges);
 
-/**
- * Get a challenge by ID
- * GET /api/challenges/:id
- */
+/* ------------------------- Challenge Metadata --------------------------- */
 router.get("/:id", getChallengeById);
+
+/* ------------------------- Container Lifecycle -------------------------- */
+router.post("/start/:id", startChallenge);
+router.post("/stop/:id", stopChallenge);
 
 module.exports = router;

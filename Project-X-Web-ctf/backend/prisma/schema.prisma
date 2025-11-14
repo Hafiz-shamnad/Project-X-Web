@@ -32,6 +32,10 @@ model Challenge {
 
   solvedBy    Solved[]
   attempts    Attempt[]
+
+  hasContainer  Boolean   @default(false) 
+  imageName       String?           // docker image name like "ctf_challenge_3"
+  containers  UserContainer[]
 }
 
 model User {
@@ -47,6 +51,7 @@ model User {
 
   attempts     Attempt[]
   solved       Solved[]   @relation("UserSolves")
+  containers    UserContainer[]
 
   bio          String?    @default("Cybersecurity enthusiast.")
   country      String?    @default("Unknown")
@@ -109,3 +114,18 @@ model Team {
   members       User[]     @relation("TeamMembers")
   solved        Solved[]   @relation("TeamSolves")
 }
+
+model UserContainer {
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  challengeId  Int
+  containerId  String    @unique  // Docker container ID
+  port         Int
+
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime?
+
+  user         User       @relation(fields: [userId], references: [id])
+  challenge    Challenge  @relation(fields: [challengeId], references: [id])
+}
+
