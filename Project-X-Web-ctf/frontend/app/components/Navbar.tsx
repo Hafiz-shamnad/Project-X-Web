@@ -1,282 +1,215 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import {
-  Shield,
-  Trophy,
-  Users,
-  Lock,
-  ChevronDown,
-  LogOut,
-  User,
-  Menu,
-  X,
-} from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
-import LogoutButton from './LogoutButton';
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { Shield, Users, Lock, User, Menu, X } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import LogoutButton from "./LogoutButton";
+import { BACKEND_URL } from "../utils/constants";
 
-/**
- * Application navigation bar.
- * Features:
- *  - Dynamic highlight of active route.
- *  - Role-based navigation (admin).
- *  - Desktop dropdown menu and mobile sidebar.
- *  - Scroll-based styling change.
- *  - Fully responsive UI.
- */
 export default function Navbar() {
-  const PATH = usePathname();
+  const pathname = usePathname();
   const router = useRouter();
 
   const [user, setUser] = useState<any>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState(false);
+  const [openMobile, setOpenMobile] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-
-  /* -----------------------------------------------------------
-   *  Fetch authenticated user 
-   * ----------------------------------------------------------- */
+  /* -------------------------------------------------------
+   * Fetch Authenticated User
+   * ------------------------------------------------------- */
   useEffect(() => {
-    const fetchUser = async () => {
+    (async () => {
       try {
-        const res = await fetch(`${API_URL}/auth/me`, {
-          credentials: 'include',
+        const res = await fetch(`${BACKEND_URL}/auth/me`, {
+          credentials: "include",
         });
 
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
         }
-      } catch (err) {
-        console.error('Failed to fetch current user:', err);
-      }
-    };
-
-    fetchUser();
-  }, [API_URL]);
-
-  /* -----------------------------------------------------------
-   *  Detect scroll for navbar border/shadow effects
-   * ----------------------------------------------------------- */
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
+      } catch {}
+    })();
   }, []);
 
-  /* -----------------------------------------------------------
-   *  Close user dropdown when clicking outside
-   * ----------------------------------------------------------- */
+  /* -------------------------------------------------------
+   * Scroll Style
+   * ------------------------------------------------------- */
   useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('click', handleOutsideClick);
-    return () => document.removeEventListener('click', handleOutsideClick);
+    const fn = () => setScrolled(window.scrollY > 10);
+    window.addEventListener("scroll", fn);
+    return () => window.removeEventListener("scroll", fn);
   }, []);
 
-  /* -----------------------------------------------------------
-   *  Helper for nav links (desktop & mobile)
-   * ----------------------------------------------------------- */
-  const navLink = (href: string, label: string, Icon: any) => {
-    const active = PATH === href;
+  /* -------------------------------------------------------
+   * Click Outside Dropdown
+   * ------------------------------------------------------- */
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setOpenMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  /* -------------------------------------------------------
+   * Reusable Item Component
+   * ------------------------------------------------------- */
+  const NavItem = (href: string, label: string, Icon: any) => {
+    const active = pathname === href;
 
     return (
       <Link
         href={href}
-        onClick={() => setMobileMenuOpen(false)}
-        className={`group relative flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold transition-all ${
-          active
-            ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-black shadow-green-500/30 shadow-lg'
-            : 'text-green-400 hover:text-green-300 hover:bg-green-900/30'
-        }`}
+        onClick={() => setOpenMobile(false)}
+        className={`
+          group flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all
+          ${
+            active
+              ? "bg-blue-500 text-black border border-blue-300 shadow-blue-300/40 shadow-md"
+              : "text-blue-400 hover:text-blue-300 hover:bg-blue-900/40"
+          }
+        `}
       >
-        <Icon
-          className={`w-4 h-4 transition-transform ${
-            active ? '' : 'group-hover:scale-110'
-          }`}
-        />
+        <Icon className={`w-4 h-4 ${!active && "group-hover:scale-110"} transition`} />
         {label}
-        {!active && (
-          <span className="absolute inset-0 rounded-lg border border-green-500/0 group-hover:border-green-500/50 transition-colors" />
-        )}
       </Link>
     );
   };
 
-  /* -----------------------------------------------------------
-   *  Rendered UI
-   * ----------------------------------------------------------- */
+  /* -------------------------------------------------------
+   * UI / JSX
+   * ------------------------------------------------------- */
   return (
     <>
-      {/* Navbar */}
+      {/* NAVBAR */}
       <nav
-        className={`sticky top-0 z-50 bg-black/95 backdrop-blur-md border-b transition-all ${
+        className={`sticky top-0 z-50 backdrop-blur-xl border-b transition-all
+        bg-slate-950/80 
+        ${
           scrolled
-            ? 'border-green-500/50 shadow-green-500/10 shadow-lg'
-            : 'border-green-500/30'
+            ? "border-blue-500/40 shadow-lg shadow-blue-500/20"
+            : "border-blue-500/20"
         }`}
       >
-        <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 py-3">
-          {/* Logo */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+
+          {/* LOGO */}
           <div
-            onClick={() => router.push('/dashboard')}
             className="flex items-center gap-2 cursor-pointer group"
+            onClick={() => router.push("/dashboard")}
           >
             <div className="relative">
-              <Shield className="w-7 h-7 text-green-500 group-hover:text-green-400 transition group-hover:scale-110 group-hover:rotate-6" />
-              <div className="absolute inset-0 blur-md bg-green-500/30 group-hover:bg-green-400/40 transition -z-10" />
+              <Shield className="w-7 h-7 text-blue-400 group-hover:text-blue-300 transition group-hover:rotate-6" />
+              <div className="absolute inset-0 blur-md bg-blue-500/20 group-hover:bg-blue-400/30 -z-10" />
             </div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent group-hover:from-green-300 group-hover:to-emerald-400 transition">
-              &gt; PROJECT_X
+
+            <h1 className="text-xl font-bold text-blue-300 tracking-wider group-hover:text-blue-200">
+              PROJECT_X
             </h1>
           </div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-2 text-sm">
-            {navLink('/dashboard', 'Dashboard', Trophy)}
-            {navLink('/team', 'Team', Users)}
-            {user?.role === 'admin' && navLink('/admin', 'Admin', Lock)}
+          {/* DESKTOP NAV */}
+          <div className="hidden md:flex items-center gap-3 text-sm">
+            {NavItem("/dashboard", "CTF Arena", Shield)}
+            {NavItem("/team", "Team", Users)}
+            {user?.role === "admin" && NavItem("/admin", "Admin", Lock)}
           </div>
 
-          {/* Desktop User Dropdown */}
+          {/* USER DROPDOWN */}
           <div className="hidden md:block relative" ref={dropdownRef}>
             <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold transition ${
-                menuOpen
-                  ? 'bg-green-900/40 text-green-300 border border-green-500/50'
-                  : 'text-green-400 hover:text-green-300 hover:bg-green-900/20'
-              }`}
-              aria-expanded={menuOpen}
+              onClick={() => setOpenMenu(!openMenu)}
+              className={`
+                flex items-center gap-2 px-3 py-2 rounded-lg transition
+                ${
+                  openMenu
+                    ? "bg-blue-900/40 text-blue-300 border border-blue-500/40"
+                    : "text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
+                }
+              `}
             >
-              {/* Avatar */}
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-black font-bold text-sm">
-                {user ? user.username[0].toUpperCase() : 'G'}
+              <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-black font-bold">
+                {user ? user.username[0].toUpperCase() : "?"}
               </div>
-
-              <span className="max-w-[120px] truncate">
-                {user?.username || 'guest'}
-              </span>
-
-              <ChevronDown
-                className={`w-4 h-4 transition-transform ${
-                  menuOpen ? 'rotate-180' : ''
-                }`}
-              />
+              <span>{user?.username || "guest"}</span>
             </button>
 
-            {menuOpen && (
-              <div className="absolute right-0 mt-2 w-52 bg-gray-900/95 backdrop-blur-md border border-green-500/50 rounded-lg shadow-2xl shadow-green-500/20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                {/* Header */}
-                <div className="p-3 border-b border-green-700/30 bg-gradient-to-br from-green-900/20 to-transparent">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-black font-bold">
-                      {user ? user.username[0].toUpperCase() : 'G'}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-green-300 text-sm">
-                        {user?.username || 'Guest'}
-                      </p>
-                      <p className="text-xs text-green-500/70">
-                        {user?.role || 'visitor'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Profile */}
+            {openMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-slate-900/95 backdrop-blur-xl border border-blue-500/40 rounded-lg shadow-xl">
                 <Link
                   href="/profile"
-                  className="flex items-center gap-3 px-4 py-3 text-sm text-green-400 hover:bg-green-900/40 hover:text-green-300 transition group"
-                  onClick={() => setMenuOpen(false)}
+                  onClick={() => setOpenMenu(false)}
+                  className="flex items-center gap-2 px-4 py-3 text-blue-400 hover:bg-blue-900/30"
                 >
-                  <User className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  View Profile
+                  <User className="w-4 h-4" />
+                  Profile
                 </Link>
 
-                {/* Logout */}
-                <div className="border-t border-green-700/30" />
-
+                <div className="border-t border-blue-800/40" />
                 <div className="p-2">
-                  <LogoutButton backendURL={API_URL} />
+                  <LogoutButton backendURL={BACKEND_URL} />
                 </div>
               </div>
             )}
           </div>
 
-          {/* Mobile Menu Button */}
+          {/* MOBILE MENU BUTTON */}
           <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-green-400 hover:text-green-300 hover:bg-green-900/20 rounded-lg transition"
-            aria-label="Toggle menu"
+            onClick={() => setOpenMobile(!openMobile)}
+            className="md:hidden p-2 text-blue-400 hover:bg-blue-900/20 rounded-lg"
           >
-            {mobileMenuOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
+            {openMobile ? <X /> : <Menu />}
           </button>
         </div>
       </nav>
 
-      {/* Mobile Overlay + Menu */}
-      {mobileMenuOpen && (
+      {/* MOBILE MENU */}
+      {openMobile && (
         <>
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-200"
-            onClick={() => setMobileMenuOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            onClick={() => setOpenMobile(false)}
           />
 
-          <div className="fixed top-[73px] left-0 right-0 bg-gray-900/98 backdrop-blur-md border-b border-green-500/30 shadow-2xl z-40 md:hidden animate-in slide-in-from-top-4 duration-300">
-            <div className="flex flex-col gap-2 p-4">
-              {/* Mobile User Badge */}
-              <div className="p-4 rounded-lg bg-gradient-to-br from-green-900/30 to-transparent border border-green-500/30 mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-black font-bold text-lg">
-                    {user ? user.username[0].toUpperCase() : 'G'}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-green-300">
-                      {user?.username || 'Guest'}
-                    </p>
-                    <p className="text-xs text-green-500/70">{user?.role}</p>
-                  </div>
-                </div>
+          <div className="fixed top-[70px] left-0 right-0 bg-slate-900/95 z-50 p-6 border-b border-blue-500/40 shadow-xl">
+
+            {/* USER INFO */}
+            <div className="flex items-center gap-3 mb-5 p-4 rounded-lg bg-blue-900/20 border border-blue-500/20">
+              <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-black font-bold">
+                {user ? user.username[0].toUpperCase() : "?"}
               </div>
-
-              {/* Mobile Navigation */}
-              {navLink('/dashboard', 'Dashboard', Trophy)}
-              {navLink('/team', 'Team', Users)}
-              {user?.role === 'admin' && navLink('/admin', 'Admin', Lock)}
-
-              {/* Profile */}
-              <div className="border-t border-green-700/30 my-2" />
-
-              <Link
-                href="/profile"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg text-green-400 hover:bg-green-900/30 hover:text-green-300 transition"
-              >
-                <User className="w-4 h-4" />
-                View Profile
-              </Link>
-
-              {/* Logout */}
-              <div className="pt-2">
-                <LogoutButton backendURL={API_URL} />
+              <div>
+                <p className="text-blue-300 font-semibold">{user?.username || "Guest"}</p>
+                <p className="text-xs text-blue-500/70">{user?.role}</p>
               </div>
+            </div>
+
+            {/* NAV ITEMS */}
+            {NavItem("/dashboard", "CTF Arena", Shield)}
+            {NavItem("/team", "Team", Users)}
+
+            {user?.role === "admin" && NavItem("/admin", "Admin", Lock)}
+
+            <div className="border-t border-blue-800/40 my-4" />
+
+            <Link
+              href="/profile"
+              onClick={() => setOpenMobile(false)}
+              className="flex items-center gap-3 px-4 py-3 rounded-lg text-blue-400 hover:bg-blue-900/40"
+            >
+              <User className="w-4 h-4" />
+              Profile
+            </Link>
+
+            <div className="pt-3">
+              <LogoutButton backendURL={BACKEND_URL} />
             </div>
           </div>
         </>

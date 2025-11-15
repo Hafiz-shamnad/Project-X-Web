@@ -20,10 +20,20 @@ const hashFlag = require("../utils/hashFlag");
  */
 exports.createChallenge = async (req, res) => {
   try {
-    const { name, category, difficulty, points, description, flag, released } =
-      req.body;
+    const {
+      name,
+      category,
+      difficulty,
+      points,
+      description,
+      flag,
+      released,
+      imageName
+    } = req.body;
 
     const filePath = req.file ? req.file.path : null;
+
+    const hasContainer = imageName && imageName.trim() !== "";
 
     const challengeData = {
       name,
@@ -34,15 +44,27 @@ exports.createChallenge = async (req, res) => {
       points: Number(points),
       released: released === "true",
       flagHash: flag ? hashFlag(flag) : null,
+      hasContainer,
+      imageName: hasContainer ? imageName.trim() : null
     };
 
     const challenge = await prisma.challenge.create({ data: challengeData });
+
     return res.json({ ok: true, challenge });
+
   } catch (err) {
     console.error("Error creating challenge:", err);
+
+    if (err.code === "P2002") {
+      return res.status(400).json({
+        error: "A challenge with this name already exists."
+      });
+    }
+
     return res.status(500).json({ error: "Failed to create challenge" });
   }
-};
+
+};;
 
 /* -------------------------------------------------------------------------- */
 /*                               Update Challenge                              */
