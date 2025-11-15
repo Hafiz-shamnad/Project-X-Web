@@ -153,167 +153,98 @@ exports.getPublicChallenges = async (req, res) => {
 /* -------------------------------------------------------------------------- */
 /*                     Docker-Based Challenge Lifecycle                        */
 /* -------------------------------------------------------------------------- */
-
-/**
- * POST /api/challenges/start/:id
- * ------------------------------
- * Starts a per-user Docker container for the specified challenge.
- *
- * Flow:
- *  - Validates user identity (req.user injected by auth middleware).
- *  - Delegates container provisioning to the container service.
- *  - Ensures idempotent behavior (only one active container per user/challenge).
- *
- * Possible Responses:
- *  - { status: "running", port }   → Already active instance
- *  - { status: "created", port }   → New container started
- *  - 401 if user is not authenticated
- */
+/* START CONTAINER */
 exports.startChallenge = async (req, res) => {
   const userId = req.user?.id;
   const challengeId = Number(req.params.id);
 
-  if (!userId) {
-    return res.status(401).json({ error: "Unauthorized user" });
-  }
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
   try {
     const result = await startChallengeContainer(userId, challengeId);
-    return res.status(200).json(result);
+    res.json(result);
   } catch (err) {
-    console.error("Start Container Error:", err);
-    return res.status(500).json({ error: err.message });
+    console.error("Start error:", err);
+    res.status(500).json({ error: err.message });
   }
 };
 
-/**
- * POST /api/challenges/stop/:id
- * -----------------------------
- * Gracefully stops a user's active Docker container for a challenge.
- *
- * Flow:
- *  - Validates user identity.
- *  - Delegates to container service which:
- *      * Stops Docker container
- *      * Removes DB metadata
- *      * Handles already-stopped containers gracefully
- *
- * Possible Responses:
- *  - { status: "destroyed" }
- *  - { status: "none" } → No active container
- *  - 401 if unauthenticated
- */
+/* STOP CONTAINER */
 exports.stopChallenge = async (req, res) => {
   const userId = req.user?.id;
   const challengeId = Number(req.params.id);
 
-  if (!userId) {
-    return res.status(401).json({ error: "Unauthorized user" });
-  }
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
   try {
     const result = await stopChallengeContainer(userId, challengeId);
-    return res.status(200).json(result);
+    res.json(result);
   } catch (err) {
-    console.error("Stop Container Error:", err);
-    return res.status(500).json({ error: err.message });
+    console.error("Stop error:", err);
+    res.status(500).json({ error: err.message });
   }
 };
 
-/**
- * GET /api/challenges/instance/:id
- * --------------------------------
- * Returns the currently running instance for a user/challenge.
- */
+/* GET INSTANCE */
 exports.getChallengeInstance = async (req, res) => {
+  const userId = req.user?.id;
+  const challengeId = Number(req.params.id);
+
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
   try {
-    const userId = req.user?.id;
-    const challengeId = Number(req.params.id);
-
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    // Fetch challenge
     const challenge = await prisma.challenge.findUnique({
       where: { id: challengeId },
-      select: {
-        hasContainer: true,
-      },
+      select: { hasContainer: true },
     });
 
-    if (!challenge) {
-      return res.status(404).json({ error: "Challenge not found" });
-    }
-
-    // Challenge does NOT use containers
-    if (!challenge.hasContainer) {
-      return res.json({ status: "no-container" });
-    }
+    if (!challenge) return res.status(404).json({ error: "Not found" });
+    if (!challenge.hasContainer) return res.json({ status: "no-container" });
 
     const instance = await prisma.userContainer.findFirst({
       where: { userId, challengeId },
     });
 
-    if (!instance) {
-      return res.json({ status: "none" });
-    }
+    if (!instance) return res.json({ status: "none" });
 
-    return res.json({
+    res.json({
       status: "running",
       port: instance.port,
       url: `http://localhost:${instance.port}`,
       expiresAt: instance.expiresAt,
     });
-
   } catch (err) {
-    console.error("Get Instance Error:", err);
-    return res.status(500).json({ error: "Server error" });
+    console.error("Get instance error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 };
 
-/**
- * POST /api/challenges/spawn/:id
- * ------------------------------
- * Start or return a user’s container instance.
- */
+/* SPAWN OR RETURN INSTANCE */
 exports.spawnChallengeInstance = async (req, res) => {
+  const userId = req.user?.id;
+  const challengeId = Number(req.params.id);
+
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
   try {
-    const userId = req.user?.id;
-    const challengeId = Number(req.params.id);
-
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
     const challenge = await prisma.challenge.findUnique({
       where: { id: challengeId },
-      select: {
-        hasContainer: true,
-      },
+      select: { hasContainer: true },
     });
 
-    if (!challenge) {
-      return res.status(404).json({ error: "Challenge not found" });
-    }
-
-    // No container allowed for this challenge
-    if (!challenge.hasContainer) {
-      return res.json({ status: "no-container" });
-    }
+    if (!challenge) return res.status(404).json({ error: "Not found" });
+    if (!challenge.hasContainer) return res.json({ status: "no-container" });
 
     const result = await startChallengeContainer(userId, challengeId);
 
-    return res.json({
+    res.json({
       status: result.status,
       port: result.port,
       url: `http://localhost:${result.port}`,
       expiresAt: result.expiresAt,
     });
-
   } catch (err) {
-    console.error("Spawn Error:", err);
-    return res.status(500).json({ error: "Server error" });
+    console.error("Spawn error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 };
-

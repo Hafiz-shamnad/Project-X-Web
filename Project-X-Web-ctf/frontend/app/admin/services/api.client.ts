@@ -37,7 +37,20 @@ export async function apiUpload(
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text);
+    let clean: any = {};
+
+    try {
+      clean = JSON.parse(text);
+    } catch {
+      // text was not JSON → ignore
+    }
+
+    const errorMessage =
+      (clean && typeof clean.error === "string" && clean.error) ||
+      text ||
+      "Unknown error";
+
+    throw new Error(errorMessage);
   }
 
   return res.json().catch(() => ({}));
