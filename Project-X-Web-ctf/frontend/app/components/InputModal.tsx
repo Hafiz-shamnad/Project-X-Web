@@ -1,8 +1,14 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
+import { createPortal } from "react-dom";
+import { motion, AnimatePresence, type Transition } from "framer-motion";
 
 /* ---------------------------------------
    TYPES
@@ -20,72 +26,83 @@ interface InputModalProps {
   onCancel: () => void;
 }
 
-/**
- * PROJECT_X — InputModal (Enhanced)
- * - Neon CYBERPUNK glow
- * - ENTER to confirm
- * - ESC to close
- * - Autofocus
- * - Smooth spring animations
- * - Terminal style green theme
- */
 export default function InputModal({
   isOpen,
-  title = 'Enter Value',
-  message = 'Please provide the required input.',
-  label = 'Value',
-  inputType = 'text',
-  placeholder = '',
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  title = "Enter Value",
+  message = "Please provide the required input.",
+  label = "Value",
+  inputType = "text",
+  placeholder = "",
+  confirmText = "Confirm",
+  cancelText = "Cancel",
   onConfirm,
   onCancel,
 }: InputModalProps) {
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState("");
   const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   /* ---------------------------------------
-     MOUNT ONLY ON CLIENT
+     SSR-SAFE MOUNT
   ---------------------------------------- */
   useEffect(() => {
     setMounted(true);
   }, []);
 
   /* ---------------------------------------
-     CLEAR INPUT WHEN CLOSED
+     RESET VALUE ON CLOSE
   ---------------------------------------- */
   useEffect(() => {
-    if (!isOpen) setValue('');
+    if (!isOpen) setValue("");
   }, [isOpen]);
 
   /* ---------------------------------------
-     KEYBOARD SHORTCUTS
-     - ESC → close
-     - ENTER → confirm
+     KEYBOARD SHORTCUTS (useCallback safe)
   ---------------------------------------- */
+  const handleKey = useCallback(
+    (e: KeyboardEvent) => {
+      if (!isOpen) return;
+
+      if (e.key === "Escape") onCancel();
+      if (e.key === "Enter" && value.trim()) onConfirm(value);
+    },
+    [isOpen, value, onCancel, onConfirm]
+  );
+
   useEffect(() => {
     if (!isOpen) return;
 
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
-      if (e.key === 'Enter' && value.trim()) onConfirm(value);
-    };
-
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isOpen, value, onCancel, onConfirm]);
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [isOpen, handleKey]);
 
   /* ---------------------------------------
-     Autofocus Input
+     Auto Focus on Open
   ---------------------------------------- */
   useEffect(() => {
-    if (isOpen && inputRef.current) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 80);
     }
   }, [isOpen]);
 
-  if (!mounted) return null;
+  /* ---------------------------------------
+     Memoize portal root (avoid recreating)
+  ---------------------------------------- */
+  const portalRoot = useMemo(
+    () => (typeof document !== "undefined" ? document.body : null),
+    []
+  );
+
+  if (!mounted || !portalRoot) return null;
+
+  /* ---------------------------------------
+     Framer Motion Animations (typed)
+  ---------------------------------------- */
+  const modalTransition: Transition = {
+    type: "spring",
+    stiffness: 200,
+    damping: 18,
+  };
 
   return createPortal(
     <AnimatePresence>
@@ -109,9 +126,9 @@ export default function InputModal({
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.85, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 200, damping: 18 }}
+            transition={modalTransition}
           >
-            {/* Green glow accent */}
+            {/* Green glow */}
             <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent pointer-events-none" />
 
             {/* Title */}
@@ -124,10 +141,8 @@ export default function InputModal({
               {message}
             </p>
 
-            {/* Input */}
-            <label className="block text-sm text-green-400 mb-2">
-              {label}
-            </label>
+            {/* Input Field */}
+            <label className="block text-sm text-green-400 mb-2">{label}</label>
 
             <input
               ref={inputRef}
@@ -170,6 +185,6 @@ export default function InputModal({
         </motion.div>
       )}
     </AnimatePresence>,
-    document.body
+    portalRoot
   );
 }

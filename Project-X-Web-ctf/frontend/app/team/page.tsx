@@ -15,10 +15,6 @@ import {
 import { apiFetch } from '@/lib/api';
 import Leaderboard from '../components/Leaderboard';
 
-//
-// -------------------- Types --------------------
-//
-
 interface Member {
   id: number;
   username: string;
@@ -33,34 +29,29 @@ interface Team {
   members?: Member[];
 }
 
-//
-// -------------------- Component --------------------
-//
-
 export default function TeamPage() {
   const [team, setTeam] = useState<Team | null>(null);
-
-  const [joinCode, setJoinCode] = useState('');
   const [teamName, setTeamName] = useState('');
+  const [joinCode, setJoinCode] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  //
-  // -------------------- Helpers --------------------
-  //
-
-  /** Display timed success messages */
-  const showSuccess = useCallback((message: string) => {
-    setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(null), 3000);
+  /* ---------------------------------------------
+   * SHOW SUCCESS (auto hide)
+   * --------------------------------------------- */
+  const showSuccess = useCallback((msg: string) => {
+    setSuccess(msg);
+    setTimeout(() => setSuccess(null), 2500);
   }, []);
 
-  /** Fetch the current team of the authenticated user */
+  /* ---------------------------------------------
+   * FETCH MY TEAM
+   * --------------------------------------------- */
   const fetchMyTeam = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -68,248 +59,238 @@ export default function TeamPage() {
     try {
       const res = await apiFetch('/team/me');
 
-      // When user has no team OR backend error
-      if (res.error || !res.team) {
+      if (!res.team || res.error) {
         setTeam(null);
-        return;
+      } else {
+        const t = res.team;
+        setTeam({
+          id: t.id,
+          name: t.name,
+          joinCode: t.joinCode,
+          totalPoints: t.totalPoints ?? 0,
+          members: t.members || [],
+        });
       }
-
-      const t = res.team;
-
-      setTeam({
-        id: t.id,
-        name: t.name,
-        joinCode: t.joinCode,
-        totalPoints: t.totalPoints ?? 0,
-        members: Array.isArray(t.members)
-          ? t.members.map((m: any) => ({
-              id: m.id,
-              username: m.username,
-              points: m.points ?? 0,
-            }))
-          : [],
-      });
-    } catch (err) {
-      console.error('Team fetch error:', err);
-      setError('Unable to load team information.');
+    } catch {
+      setError('Failed to load team.');
       setTeam(null);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  /** Create a new team */
-  const createTeam = async () => {
-    if (!teamName.trim()) return setError('Team name is required.');
+  /* ---------------------------------------------
+   * CREATE TEAM
+   * --------------------------------------------- */
+  const createTeam = useCallback(async () => {
+    if (!teamName.trim()) return setError('Team name required.');
 
     setSaving(true);
     setError(null);
 
     try {
-      const res: any = await apiFetch('/team/create', {
+      const res = await apiFetch('/team/create', {
         method: 'POST',
         body: JSON.stringify({ name: teamName }),
       });
 
-      if (res.error) {
-        setError(res.error);
-      } else {
-        showSuccess('Team created successfully.');
-        await fetchMyTeam();
+      if (res.error) setError(res.error);
+      else {
+        showSuccess('Team created.');
+        fetchMyTeam();
       }
     } catch {
-      setError('Server error while creating team.');
+      setError('Server error.');
     } finally {
       setSaving(false);
       setTeamName('');
     }
-  };
+  }, [teamName, fetchMyTeam, showSuccess]);
 
-  /** Join a team */
-  const joinTeam = async () => {
-    if (!joinCode.trim()) return setError('Join code is required.');
+  /* ---------------------------------------------
+   * JOIN TEAM
+   * --------------------------------------------- */
+  const joinTeam = useCallback(async () => {
+    if (!joinCode.trim()) return setError('Join code required.');
 
     setSaving(true);
     setError(null);
 
     try {
-      const res: any = await apiFetch('/team/join', {
+      const res = await apiFetch('/team/join', {
         method: 'POST',
         body: JSON.stringify({ joinCode }),
       });
 
-      if (res.error) {
-        setError(res.error);
-      } else {
-        showSuccess('Successfully joined team.');
-        await fetchMyTeam();
+      if (res.error) setError(res.error);
+      else {
+        showSuccess('Joined team.');
+        fetchMyTeam();
       }
     } catch {
-      setError('Server error while joining team.');
+      setError('Server error.');
     } finally {
       setSaving(false);
       setJoinCode('');
     }
-  };
+  }, [joinCode, fetchMyTeam, showSuccess]);
 
-  /** Copy join code to clipboard */
-  const copyJoinCode = () => {
+  /* ---------------------------------------------
+   * COPY JOIN CODE
+   * --------------------------------------------- */
+  const copyJoin = useCallback(() => {
     if (!team?.joinCode) return;
-
     navigator.clipboard.writeText(team.joinCode);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
+    setTimeout(() => setCopied(false), 1000);
+  }, [team]);
 
-  //
-  // -------------------- Effects --------------------
-  //
-
+  /* ---------------------------------------------
+   * LOAD TEAM ON MOUNT
+   * --------------------------------------------- */
   useEffect(() => {
     fetchMyTeam();
   }, [fetchMyTeam]);
 
-  //
-  // -------------------- UI States --------------------
-  //
-
+  /* ---------------------------------------------
+   * LOADING
+   * --------------------------------------------- */
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black text-green-400">
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0f1f] text-blue-300">
         <RefreshCw className="animate-spin w-8 h-8" />
-        <span className="ml-3">Loading team info...</span>
+        <span className="ml-3">Loading team...</span>
       </div>
     );
   }
 
-  //
-  // -------------------- Render --------------------
-  //
-
+  /* ---------------------------------------------
+   * MAIN RENDER
+   * --------------------------------------------- */
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-green-400 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0f1f] to-[#0d1b2a] text-blue-200 p-6">
       <div className="max-w-5xl mx-auto">
 
-        {/* Success Message */}
-        {successMessage && (
-          <div className="mb-4 bg-green-900/30 border border-green-500/40 
-                          p-3 rounded-lg text-green-300 flex items-center gap-2">
+        {/* SUCCESS */}
+        {success && (
+          <div className="mb-5 bg-blue-900/30 border border-blue-400/40 p-3 rounded-lg flex items-center gap-2 text-blue-200">
             <Check className="w-5 h-5" />
-            {successMessage}
+            {success}
           </div>
         )}
 
-        {/* Error Message */}
+        {/* ERROR */}
         {error && (
-          <div className="mb-4 bg-red-900/30 border border-red-500/40 
-                          p-3 rounded-lg text-red-300">
+          <div className="mb-5 bg-red-900/30 border border-red-400/40 p-3 rounded-lg text-red-300">
             {error}
           </div>
         )}
 
-        {/* -------------------- TEAM EXISTS -------------------- */}
+        {/* TEAM EXISTS */}
         {team ? (
           <>
-            {/* Team Header */}
-            <div className="p-6 border border-green-500/30 rounded-2xl
-                            bg-gradient-to-br from-green-950/30 via-gray-900/50 to-black mb-8">
+            {/* TEAM CARD */}
+            <div className="p-6 rounded-2xl bg-[#0b1428]/70 backdrop-blur-xl border border-blue-500/20 shadow-xl shadow-blue-900/40 mb-10">
 
+              {/* Header */}
               <div className="flex justify-between items-center mb-4">
-                <h1 className="text-3xl font-bold text-green-400 flex items-center gap-2">
-                  <Shield className="w-6 h-6" />
+                <h1 className="text-3xl font-bold text-blue-200 flex items-center gap-2">
+                  <Shield className="w-7 h-7 text-blue-400" />
                   {team.name}
                 </h1>
 
                 <button
                   onClick={fetchMyTeam}
-                  className="p-2 border border-green-500/30 rounded-lg hover:bg-green-900/30 transition"
+                  className="p-2 border border-blue-500/30 rounded-lg hover:bg-blue-900/30 transition"
                 >
-                  <RefreshCw className="w-5 h-5" />
+                  <RefreshCw className="w-5 h-5 text-blue-300" />
                 </button>
               </div>
 
-              <div className="flex items-center gap-3">
-                <Trophy className="text-yellow-400 w-6 h-6" />
-                <p className="text-lg font-semibold text-green-300">
-                  Total Points: {team.totalPoints ?? 0}
+              {/* Points */}
+              <div className="flex items-center gap-2 mb-4">
+                <Trophy className="w-6 h-6 text-yellow-400" />
+                <p className="text-lg font-semibold text-blue-300">
+                  {team.totalPoints} pts
                 </p>
               </div>
 
               {/* Join Code */}
               {team.joinCode && (
-                <div className="mt-3 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-green-400" />
-
-                  <code className="bg-black/40 px-3 py-1 rounded-lg border border-green-500/30 font-mono">
+                <div className="flex items-center gap-2 mt-2">
+                  <Sparkles className="w-5 h-5 text-blue-300" />
+                  <code className="px-3 py-1 rounded bg-black/40 border border-blue-500/20 font-mono">
                     {team.joinCode}
                   </code>
-
                   <button
-                    onClick={copyJoinCode}
-                    className="border border-green-500/40 px-3 py-1 rounded-lg hover:bg-green-900/30 transition"
+                    onClick={copyJoin}
+                    className="px-3 py-1 border border-blue-500/30 rounded hover:bg-blue-900/30 transition"
                   >
-                    {copied ? 'Copied!' : 'Copy'}
+                    {copied ? 'Copied' : 'Copy'}
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Member Leaderboard */}
+            {/* Members & Leaderboard */}
             <Leaderboard
-              backendUrl={process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000/api'}
+              backendUrl={
+                process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'
+              }
               teamId={team.id}
             />
           </>
         ) : (
-          //
-          // -------------------- NO TEAM: JOIN / CREATE --------------------
-          //
+          /* ---------------------------------------------
+           * NO TEAM — JOIN OR CREATE
+           * --------------------------------------------- */
           <div className="text-center mt-20 space-y-10">
 
-            <h2 className="text-3xl font-bold text-green-400">
-              Join or Create a Team to Start Competing
+            <h2 className="text-3xl font-bold text-blue-200">
+              Join or Create a Team
             </h2>
 
-            <div className="grid sm:grid-cols-2 gap-6">
+            <div className="grid sm:grid-cols-2 gap-8">
+
               {/* Create Team */}
-              <div className="border border-green-500/40 p-6 rounded-xl bg-black/40">
-                <h3 className="font-bold text-xl mb-3 flex items-center gap-2">
-                  <Plus className="w-5 h-5" /> Create a Team
+              <div className="p-6 rounded-xl bg-[#0b1428]/70 border border-blue-500/20 backdrop-blur-xl shadow shadow-blue-900/30">
+                <h3 className="font-bold text-xl mb-3 flex items-center gap-2 text-blue-300">
+                  <Plus className="w-5 h-5" /> Create Team
                 </h3>
 
                 <input
-                  placeholder="Enter team name"
+                  placeholder="Team name"
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
-                  className="w-full p-3 mb-3 rounded-lg bg-black/60 border border-green-500/30 text-white"
+                  className="w-full p-3 mb-3 rounded bg-[#0a0f1f] border border-blue-500/20 text-blue-200 outline-none focus:border-blue-400"
                 />
 
                 <button
-                  onClick={createTeam}
                   disabled={!teamName.trim() || saving}
-                  className="w-full bg-green-500 text-black py-3 rounded-lg font-semibold hover:bg-green-400 disabled:opacity-50 transition"
+                  onClick={createTeam}
+                  className="w-full py-3 rounded-lg font-semibold bg-blue-500 text-black hover:bg-blue-400 disabled:opacity-50 transition"
                 >
                   {saving ? 'Creating...' : 'Create'}
                 </button>
               </div>
 
               {/* Join Team */}
-              <div className="border border-green-500/40 p-6 rounded-xl bg-black/40">
-                <h3 className="font-bold text-xl mb-3 flex items-center gap-2">
-                  <LogIn className="w-5 h-5" /> Join a Team
+              <div className="p-6 rounded-xl bg-[#0b1428]/70 border border-blue-500/20 backdrop-blur-xl shadow shadow-blue-900/30">
+                <h3 className="font-bold text-xl mb-3 flex items-left gap-2 text-blue-300">
+                  <LogIn className="w-5 h-5" /> Join Team
                 </h3>
 
                 <input
-                  placeholder="Enter join code"
+                  placeholder="Join code"
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value)}
-                  className="w-full p-3 mb-3 rounded-lg bg-black/60 border border-green-500/30 text-white"
+                  className="w-full p-3 mb-3 rounded bg-[#0a0f1f] border border-blue-500/20 text-blue-200 outline-none focus:border-blue-400"
                 />
 
                 <button
-                  onClick={joinTeam}
                   disabled={!joinCode.trim() || saving}
-                  className="w-full bg-green-500 text-black py-3 rounded-lg font-semibold hover:bg-green-400 disabled:opacity-50 transition"
+                  onClick={joinTeam}
+                  className="w-full py-3 rounded-lg font-semibold bg-blue-500 text-black hover:bg-blue-400 disabled:opacity-50 transition"
                 >
                   {saving ? 'Joining...' : 'Join'}
                 </button>

@@ -3,14 +3,47 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Shield, Users, Lock, User, Menu, X } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import LogoutButton from "./LogoutButton";
 import { BACKEND_URL } from "../utils/constants";
+
+/* -------------------------------------------------------
+ * Memoized Nav Item Component
+ * ------------------------------------------------------- */
+const NavItemComponent = ({
+  href,
+  label,
+  Icon,
+  active,
+  onClick,
+}: {
+  href: string;
+  label: string;
+  Icon: any;
+  active: boolean;
+  onClick: () => void;
+}) => (
+  <Link
+    href={href}
+    onClick={onClick}
+    className={`group flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all ${
+      active
+        ? "bg-blue-500 text-black border border-blue-300 shadow-blue-300/40 shadow-md"
+        : "text-blue-400 hover:text-blue-300 hover:bg-blue-900/40"
+    }`}
+  >
+    <Icon className={`w-4 h-4 transition ${!active ? "group-hover:scale-110" : ""}`} />
+    {label}
+  </Link>
+);
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
 
+  /* -------------------------------------------------------
+   * STATE
+   * ------------------------------------------------------- */
   const [user, setUser] = useState<any>(null);
   const [openMenu, setOpenMenu] = useState(false);
   const [openMobile, setOpenMobile] = useState(false);
@@ -19,87 +52,96 @@ export default function Navbar() {
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   /* -------------------------------------------------------
-   * Fetch Authenticated User
+   * Fetch Authenticated User (one-time, optimized)
    * ------------------------------------------------------- */
   useEffect(() => {
-    (async () => {
+    let active = true;
+
+    const loadUser = async () => {
       try {
         const res = await fetch(`${BACKEND_URL}/auth/me`, {
           credentials: "include",
         });
+        if (!active) return;
 
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
         }
       } catch {}
-    })();
+    };
+
+    loadUser();
+    return () => {
+      active = false;
+    };
   }, []);
 
   /* -------------------------------------------------------
-   * Scroll Style
+   * Scroll Listener (optimized throttle)
    * ------------------------------------------------------- */
   useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", fn);
-    return () => window.removeEventListener("scroll", fn);
+    const onScroll = () => {
+      const isScrolled = window.scrollY > 10;
+      setScrolled((prev) => (prev !== isScrolled ? isScrolled : prev));
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   /* -------------------------------------------------------
    * Click Outside Dropdown
    * ------------------------------------------------------- */
   useEffect(() => {
-    const handler = (e: any) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+    const handler = (e: MouseEvent) => {
+      if (!dropdownRef.current) return;
+      if (!dropdownRef.current.contains(e.target as Node)) {
         setOpenMenu(false);
       }
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+
+    // using capture to ensure correct firing
+    document.addEventListener("mousedown", handler, true);
+    return () => document.removeEventListener("mousedown", handler, true);
   }, []);
 
   /* -------------------------------------------------------
-   * Reusable Item Component
+   * Memoized NavItem callback
    * ------------------------------------------------------- */
-  const NavItem = (href: string, label: string, Icon: any) => {
-    const active = pathname === href;
-
-    return (
-      <Link
+  const NavItem = useCallback(
+    (href: string, label: string, Icon: any) => (
+      <NavItemComponent
         href={href}
+        label={label}
+        Icon={Icon}
+        active={pathname === href}
         onClick={() => setOpenMobile(false)}
-        className={`
-          group flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all
-          ${
-            active
-              ? "bg-blue-500 text-black border border-blue-300 shadow-blue-300/40 shadow-md"
-              : "text-blue-400 hover:text-blue-300 hover:bg-blue-900/40"
-          }
-        `}
-      >
-        <Icon className={`w-4 h-4 ${!active && "group-hover:scale-110"} transition`} />
-        {label}
-      </Link>
-    );
-  };
+      />
+    ),
+    [pathname]
+  );
 
   /* -------------------------------------------------------
-   * UI / JSX
+   * Handlers (memoized)
+   * ------------------------------------------------------- */
+  const toggleMobile = useCallback(() => setOpenMobile((p) => !p), []);
+  const toggleDropdown = useCallback(() => setOpenMenu((p) => !p), []);
+
+  /* -------------------------------------------------------
+   * UI RENDER
    * ------------------------------------------------------- */
   return (
     <>
       {/* NAVBAR */}
       <nav
-        className={`sticky top-0 z-50 backdrop-blur-xl border-b transition-all
-        bg-slate-950/80 
-        ${
+        className={`sticky top-0 z-50 backdrop-blur-xl border-b transition-all bg-slate-950/80 ${
           scrolled
             ? "border-blue-500/40 shadow-lg shadow-blue-500/20"
             : "border-blue-500/20"
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-
           {/* LOGO */}
           <div
             className="flex items-center gap-2 cursor-pointer group"
@@ -125,15 +167,12 @@ export default function Navbar() {
           {/* USER DROPDOWN */}
           <div className="hidden md:block relative" ref={dropdownRef}>
             <button
-              onClick={() => setOpenMenu(!openMenu)}
-              className={`
-                flex items-center gap-2 px-3 py-2 rounded-lg transition
-                ${
-                  openMenu
-                    ? "bg-blue-900/40 text-blue-300 border border-blue-500/40"
-                    : "text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
-                }
-              `}
+              onClick={toggleDropdown}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition ${
+                openMenu
+                  ? "bg-blue-900/40 text-blue-300 border border-blue-500/40"
+                  : "text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
+              }`}
             >
               <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-black font-bold">
                 {user ? user.username[0].toUpperCase() : "?"}
@@ -162,7 +201,7 @@ export default function Navbar() {
 
           {/* MOBILE MENU BUTTON */}
           <button
-            onClick={() => setOpenMobile(!openMobile)}
+            onClick={toggleMobile}
             className="md:hidden p-2 text-blue-400 hover:bg-blue-900/20 rounded-lg"
           >
             {openMobile ? <X /> : <Menu />}
@@ -179,7 +218,6 @@ export default function Navbar() {
           />
 
           <div className="fixed top-[70px] left-0 right-0 bg-slate-900/95 z-50 p-6 border-b border-blue-500/40 shadow-xl">
-
             {/* USER INFO */}
             <div className="flex items-center gap-3 mb-5 p-4 rounded-lg bg-blue-900/20 border border-blue-500/20">
               <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-black font-bold">
@@ -194,7 +232,6 @@ export default function Navbar() {
             {/* NAV ITEMS */}
             {NavItem("/dashboard", "CTF Arena", Shield)}
             {NavItem("/team", "Team", Users)}
-
             {user?.role === "admin" && NavItem("/admin", "Admin", Lock)}
 
             <div className="border-t border-blue-800/40 my-4" />

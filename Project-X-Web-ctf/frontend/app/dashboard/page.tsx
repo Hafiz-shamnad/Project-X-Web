@@ -14,15 +14,14 @@ import { useChallenges } from "../hooks/useChallenges";
 import type { Challenge } from "../types/Challenge";
 
 export default function ProjectXCTF() {
-  const [activeTab, setActiveTab] =
-    useState<"challenges" | "leaderboard">("challenges");
-  const [selectedChallenge, setSelectedChallenge] =
-    useState<Challenge | null>(null);
+  const [activeTab, setActiveTab] = useState<"challenges" | "leaderboard">(
+    "challenges"
+  );
+  const [selected, setSelected] = useState<Challenge | null>(null);
 
   const { user, loading, bannedDate, isTempBanned, isPermanentBanned } =
     useUser();
-  const { timerDisplay, isActive: tempTimerActive } =
-    useBanTimer(bannedDate);
+  const { timerDisplay, isActive: tempTimerActive } = useBanTimer(bannedDate);
   const {
     challenges,
     solvedIds,
@@ -32,10 +31,10 @@ export default function ProjectXCTF() {
 
   // Initial selection
   useEffect(() => {
-    if (!loading && !challengesLoading && !selectedChallenge && challenges[0]) {
-      setSelectedChallenge(challenges[0]);
+    if (!loading && !challengesLoading && !selected && challenges[0]) {
+      setSelected(challenges[0]);
     }
-  }, [loading, challengesLoading, challenges, selectedChallenge]);
+  }, [loading, challengesLoading, challenges, selected]);
 
   if (loading || challengesLoading) {
     return <LoadingScreen />;
@@ -55,37 +54,37 @@ export default function ProjectXCTF() {
       <div className="fixed inset-0 z-0">
         {/* Grid Pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(34,197,94,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(34,197,94,0.03)_1px,transparent_1px)] bg-[size:50px_50px]" />
-        
+
         {/* Gradient Orbs */}
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-green-500/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
-        
+
         {/* Scan Lines */}
         <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(34,197,94,0.02)_50%)] bg-[length:100%_4px] pointer-events-none" />
       </div>
 
       {/* Content */}
       <div className="relative z-10">
-        <Toaster 
+        <Toaster
           position="top-right"
           toastOptions={{
             style: {
-              background: '#1a1a1a',
-              color: '#22c55e',
-              border: '1px solid rgba(34, 197, 94, 0.3)',
-              borderRadius: '12px',
-              fontFamily: 'monospace',
+              background: "#1a1a1a",
+              color: "#22c55e",
+              border: "1px solid rgba(34, 197, 94, 0.3)",
+              borderRadius: "12px",
+              fontFamily: "monospace",
             },
             success: {
               iconTheme: {
-                primary: '#22c55e',
-                secondary: '#000',
+                primary: "#22c55e",
+                secondary: "#000",
               },
             },
             error: {
               iconTheme: {
-                primary: '#ef4444',
-                secondary: '#000',
+                primary: "#ef4444",
+                secondary: "#000",
               },
             },
           }}
@@ -97,12 +96,13 @@ export default function ProjectXCTF() {
           <main className="flex flex-col md:flex-row h-[calc(100vh-80px)] overflow-hidden">
             <ChallengeList
               challenges={challenges}
+              selected={selected}
               solvedIds={solvedIds}
-              selected={selectedChallenge}
-              onSelect={setSelectedChallenge}
+              onSelect={(c) => setSelected(c)}
             />
+
             <ChallengeDetails
-              selected={selectedChallenge}
+              selected={selected}
               solvedIds={solvedIds}
               username={user?.username ?? ""}
               refreshChallenges={refresh}
@@ -117,7 +117,8 @@ export default function ProjectXCTF() {
 
       <style jsx>{`
         @keyframes pulse-slow {
-          0%, 100% {
+          0%,
+          100% {
             opacity: 0.3;
           }
           50% {

@@ -1,22 +1,31 @@
 import { apiClient } from "./api.client";
 
 export const TeamService = {
-  list: () => apiClient("/admin/teams"),
+  /** Fetch all teams */
+  list() {
+    return apiClient("/admin/teams");
+  },
 
-  ban: (id: number, durationMinutes: number) =>
-    apiClient(`/admin/team/${id}/ban`, {
+  /** Temporary ban (duration in minutes) */
+  ban(id: number, durationMinutes: number) {
+    return apiClient(`/admin/team/${id}/ban`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ durationMinutes }),
-    }),
+    });
+  },
 
-  unban: (id: number) =>
-    apiClient(`/admin/team/${id}/unban`, { method: "POST" }),
-
-  penalty: (id: number, points: number) =>
-    apiClient(`/admin/team/${id}/penalty`, {
+  /** Remove ban */
+  unban(id: number) {
+    return apiClient(`/admin/team/${id}/unban`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+    });
+  },
+
+  /** Apply penalty (deduct points) */
+  penalty(id: number, points: number) {
+    return apiClient(`/admin/team/${id}/penalty`, {
+      method: "POST",
       body: JSON.stringify({ penalty: points }),
-    }),
+    });
+  },
 };

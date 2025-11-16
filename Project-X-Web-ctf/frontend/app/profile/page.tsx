@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   User,
   Flag,
@@ -28,10 +28,7 @@ interface Profile {
     category: string;
     points: number;
   }[];
-  team?: {
-    id: number;
-    name: string;
-  } | null;
+  team?: { id: number; name: string } | null;
 }
 
 interface ProfileForm {
@@ -40,16 +37,6 @@ interface ProfileForm {
   avatarUrl: string;
 }
 
-/**
- * ProfilePage
- * -----------
- * Displays and updates user profile:
- *  - Bio
- *  - Country
- *  - Avatar URL
- *  - Solved challenges list
- *  - Stats summary
- */
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [form, setForm] = useState<ProfileForm>({
@@ -62,10 +49,8 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
 
-  /**
-   * Fetch authenticated user’s profile
-   */
-  const fetchProfile = async () => {
+  /** Fetch Profile — Optimized */
+  const fetchProfile = useCallback(async () => {
     try {
       setLoading(true);
       const data = await apiFetch('/profile/me');
@@ -81,21 +66,19 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  /**
-   * Save profile updates
-   */
-  const saveProfile = async () => {
-    setSaving(true);
+  /** Save Profile */
+  const saveProfile = useCallback(async () => {
     try {
-      const response = await apiFetch('/profile/me', {
+      setSaving(true);
+      const res = await apiFetch('/profile/me', {
         method: 'PUT',
         body: JSON.stringify(form),
       });
 
-      if (response.user) {
-        setProfile(response.user);
+      if (res.user) {
+        setProfile(res.user);
         setEditing(false);
       }
     } catch (err) {
@@ -103,18 +86,18 @@ export default function ProfilePage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [form]);
 
   useEffect(() => {
     fetchProfile();
-  }, []);
+  }, [fetchProfile]);
 
-  /* --------------------------------------------------------------------------
-   * LOADING STATE
-   * -------------------------------------------------------------------------- */
+  /* ----------------------------------------------------------------------
+   * LOADING
+   * ---------------------------------------------------------------------- */
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black text-green-400">
+      <div className="flex items-center justify-center min-h-screen bg-[#0a0f1f] text-blue-300">
         <RefreshCw className="w-6 h-6 animate-spin mr-2" />
         Loading profile...
       </div>
@@ -123,27 +106,27 @@ export default function ProfilePage() {
 
   if (!profile) {
     return (
-      <div className="text-center text-green-400 p-10">
+      <div className="text-center p-10 text-blue-300 bg-[#0a0f1f]">
         No profile found. Please log in.
       </div>
     );
   }
 
-  /* --------------------------------------------------------------------------
-   * MAIN UI
-   * -------------------------------------------------------------------------- */
+  /* ----------------------------------------------------------------------
+   * MAIN UI — Blue Theme
+   * ---------------------------------------------------------------------- */
   return (
-    <div className="min-h-screen bg-black text-green-500 p-6">
-      <div className="max-w-3xl mx-auto border border-green-600 rounded-lg p-8 bg-gray-900/50 shadow-xl shadow-green-500/10">
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0f1f] to-[#0d1b2a] text-blue-300 p-6">
+      <div className="max-w-3xl mx-auto bg-[#0b1428]/70 backdrop-blur-lg border border-blue-500/30 shadow-xl shadow-blue-900/30 rounded-xl p-8">
 
         {/* HEADER */}
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-green-300">&gt; Profile</h1>
+          <h1 className="text-3xl font-bold text-blue-200">&gt; Profile</h1>
 
           {!editing ? (
             <button
               onClick={() => setEditing(true)}
-              className="flex items-center gap-2 px-3 py-1 text-sm font-semibold border border-green-600 rounded hover:bg-green-900/30 transition"
+              className="flex items-center gap-2 px-3 py-1 text-sm border border-blue-500 rounded hover:bg-blue-900/30 transition"
             >
               <Edit3 className="w-4 h-4" />
               Edit
@@ -153,7 +136,7 @@ export default function ProfilePage() {
               <button
                 onClick={saveProfile}
                 disabled={saving}
-                className="flex items-center gap-1 px-4 py-1 text-sm font-semibold bg-green-500 text-black rounded hover:bg-green-400 transition disabled:opacity-60"
+                className="flex items-center gap-1 px-4 py-1 text-sm bg-blue-500 text-black rounded hover:bg-blue-400 transition disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 {saving ? 'Saving...' : 'Save'}
@@ -161,7 +144,7 @@ export default function ProfilePage() {
 
               <button
                 onClick={() => setEditing(false)}
-                className="flex items-center gap-1 px-4 py-1 text-sm font-semibold border border-red-500 text-red-400 rounded hover:bg-red-900/40 transition"
+                className="flex items-center gap-1 px-4 py-1 text-sm border border-red-500 text-red-400 rounded hover:bg-red-900/40 transition"
               >
                 <X className="w-4 h-4" />
                 Cancel
@@ -174,18 +157,15 @@ export default function ProfilePage() {
         <div className="flex items-center gap-6 mb-10">
           <img
             src={form.avatarUrl || '/default-avatar.png'}
-            alt="avatar"
-            className="w-24 h-24 rounded-full border-2 border-green-500 object-cover"
+            className="w-28 h-28 rounded-full border-2 border-blue-500 shadow shadow-blue-900/60 object-cover"
           />
 
           <div className="flex-1">
-            <h2 className="text-3xl font-bold text-white">
-              {profile.username}
-            </h2>
+            <h2 className="text-3xl font-bold text-white">{profile.username}</h2>
 
             {/* Bio */}
             {!editing ? (
-              <p className="text-green-300 mt-1 text-sm">
+              <p className="text-blue-300 mt-1 text-sm">
                 {profile.bio || 'No bio added yet.'}
               </p>
             ) : (
@@ -193,24 +173,24 @@ export default function ProfilePage() {
                 rows={2}
                 value={form.bio}
                 onChange={(e) => setForm({ ...form, bio: e.target.value })}
-                className="w-full p-2 mt-2 bg-black border border-green-600 rounded text-green-300 text-sm"
+                className="w-full p-2 mt-2 bg-[#0a1020] border border-blue-600 rounded text-blue-200 text-sm"
               />
             )}
 
             {/* Country / Team */}
-            <div className="flex items-center gap-4 mt-3 text-sm">
+            <div className="mt-3 text-sm space-y-2">
               {!editing ? (
                 <>
                   {profile.country && (
                     <div className="flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
+                      <MapPin className="w-4 h-4 text-blue-400" />
                       {profile.country}
                     </div>
                   )}
 
                   {profile.team && (
                     <div className="flex items-center gap-1">
-                      <Users className="w-4 h-4" />
+                      <Users className="w-4 h-4 text-blue-400" />
                       {profile.team.name}
                     </div>
                   )}
@@ -221,14 +201,16 @@ export default function ProfilePage() {
                     placeholder="Country"
                     value={form.country}
                     onChange={(e) => setForm({ ...form, country: e.target.value })}
-                    className="p-2 bg-black border border-green-600 rounded text-green-300 text-sm"
+                    className="p-2 bg-[#0a1020] border border-blue-600 rounded text-blue-200 text-sm"
                   />
 
                   <input
                     placeholder="Avatar URL"
                     value={form.avatarUrl}
-                    onChange={(e) => setForm({ ...form, avatarUrl: e.target.value })}
-                    className="p-2 bg-black border border-green-600 rounded text-green-300 text-sm"
+                    onChange={(e) =>
+                      setForm({ ...form, avatarUrl: e.target.value })
+                    }
+                    className="p-2 bg-[#0a1020] border border-blue-600 rounded text-blue-200 text-sm"
                   />
                 </div>
               )}
@@ -238,21 +220,12 @@ export default function ProfilePage() {
 
         {/* STATS */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-10">
-          {/* POINTS */}
-          <ProfileStat
-            icon={Trophy}
-            value={profile.totalPoints}
-            label="Total Points"
-          />
-
-          {/* CHALLENGES SOLVED */}
+          <ProfileStat icon={Trophy} value={profile.totalPoints} label="Total Points" />
           <ProfileStat
             icon={Flag}
             value={profile.challengesSolved?.length || 0}
-            label="Challenges Solved"
+            label="Solved"
           />
-
-          {/* DATE JOINED */}
           <ProfileStat
             icon={User}
             value={new Date(profile.createdAt).toLocaleDateString()}
@@ -261,7 +234,7 @@ export default function ProfilePage() {
         </div>
 
         {/* SOLVED CHALLENGES */}
-        <h2 className="text-xl font-bold mb-3 border-b border-green-700 pb-2">
+        <h2 className="text-xl font-bold mb-3 border-b border-blue-500/40 pb-2">
           Solved Challenges
         </h2>
 
@@ -270,18 +243,18 @@ export default function ProfilePage() {
             {profile.challengesSolved.map((c) => (
               <div
                 key={c.id}
-                className="border border-green-700 rounded-lg p-4 flex items-center justify-between bg-black/40"
+                className="border border-blue-500/40 rounded-lg p-4 flex items-center justify-between bg-[#0a1020]/70"
               >
                 <div>
                   <div className="text-white font-semibold">{c.name}</div>
-                  <div className="text-xs text-green-400">{c.category}</div>
+                  <div className="text-xs text-blue-400">{c.category}</div>
                 </div>
-                <span className="font-bold text-green-300">{c.points} pts</span>
+                <span className="font-bold text-blue-300">{c.points} pts</span>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-gray-400 text-sm">No challenges solved yet.</p>
+          <p className="text-blue-300 text-sm">No challenges solved yet.</p>
         )}
       </div>
     </div>
@@ -289,7 +262,7 @@ export default function ProfilePage() {
 }
 
 /* ==========================================================================
- * Reusable stat card component
+ * Reusable Stat Component
  * ========================================================================== */
 function ProfileStat({
   icon: Icon,
@@ -301,10 +274,10 @@ function ProfileStat({
   label: string;
 }) {
   return (
-    <div className="border border-green-600 rounded-lg p-4 text-center shadow-green-500/10 shadow-md bg-gray-900/40">
-      <Icon className="w-6 h-6 mx-auto mb-1 text-green-300" />
-      <div className="text-xl font-bold">{value}</div>
-      <p className="text-xs text-green-400">{label}</p>
+    <div className="border border-blue-500/40 rounded-lg p-4 text-center bg-[#0a1020]/60 shadow shadow-blue-900/30">
+      <Icon className="w-6 h-6 mx-auto mb-2 text-blue-300" />
+      <div className="text-xl font-bold text-white">{value}</div>
+      <p className="text-xs text-blue-400">{label}</p>
     </div>
   );
 }

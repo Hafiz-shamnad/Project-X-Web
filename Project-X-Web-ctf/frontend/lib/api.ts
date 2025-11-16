@@ -1,62 +1,76 @@
 /**
  * API Client Utility
  * ------------------
- * Centralized HTTP wrapper for communicating with the backend API.
- * Features:
- *  - Automatic base URL selection (env or localhost fallback)
- *  - Normalized JSON requests
- *  - Cookie forwarding (required for JWT authentication)
- *  - Consistent error handling and response formatting
+ * Fast, safe, minimal wrapper around fetch().
+ * - Auto-select API URL (env > localhost)
+ * - Safe JSON parsing (handles empty responses)
+ * - Normalized errors with meaningful messages
+ * - Includes credentials for cookie-based auth
  */
 
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
-/**
- * Sends a request to the backend API.
- *
- * @param endpoint - API endpoint path, starting with '/'
- * @param options  - Fetch API options (method, body, headers, etc.)
- *
- * @returns Parsed JSON response or throws on network failure
- *
- * Example:
- *   apiFetch("/auth/login", { method: "POST", body: JSON.stringify(data) })
- */
+/* ----------------------------------------------
+ * Types
+ * ---------------------------------------------- */
+interface ApiOptions extends RequestInit {
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+}
+
+/* ----------------------------------------------
+ * Main API Helper
+ * ---------------------------------------------- */
 export async function apiFetch<T = any>(
   endpoint: string,
-  options: RequestInit = {}
+  options: ApiOptions = {}
 ): Promise<T> {
   const url = `${API_URL}${endpoint}`;
 
-  const requestOptions: RequestInit = {
-    credentials: "include", // Required for HTTP-only cookie authentication
-    ...options,
+  const req: RequestInit = {
+    method: options.method || "GET",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
+    body: options.body,
   };
 
-  let response: Response;
+  let res: Response;
 
+  /** -----------------------------------------
+   * Network layer catch (DNS / offline / blocked)
+   * ----------------------------------------- */
   try {
-    response = await fetch(url, requestOptions);
+    res = await fetch(url, req);
   } catch (err) {
-    throw new Error(`Network error: ${(err as Error).message}`);
+    const msg = (err as Error)?.message || "Unknown network error";
+    throw new Error(`Network unreachable: ${msg}`);
   }
 
-  let data: any;
-  try {
-    data = await response.json();
-  } catch {
-    throw new Error("Invalid JSON response from server.");
+  /** -----------------------------------------
+   * Parse response (safe for 204/empty bodies)
+   * ----------------------------------------- */
+  let data: any = null;
+  if (res.status !== 204) {
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error("Server returned invalid JSON.");
+    }
   }
 
-  // Normalize errors based on HTTP status codes
-  if (!response.ok) {
-    const message = data?.error || data?.message || "API request failed";
-    throw new Error(message);
+  /** -----------------------------------------
+   * Normalize API errors
+   * ----------------------------------------- */
+  if (!res.ok) {
+    const msg =
+      data?.error ||
+      data?.message ||
+      `Request failed with status ${res.status}`;
+
+    throw new Error(msg);
   }
 
   return data as T;

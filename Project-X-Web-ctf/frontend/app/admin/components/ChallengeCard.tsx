@@ -1,21 +1,26 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import { Eye, EyeOff, Trash2 } from "lucide-react";
 import { Challenge } from "../types/Challenge";
 
-export default function ChallengeCard({
-  challenge,
-  selected,
-  onSelect,
-  onToggleRelease,
-  onDelete,
-}: {
+interface ChallengeCardProps {
   challenge: Challenge;
   selected: boolean;
   onSelect: () => void;
   onToggleRelease: () => void;
   onDelete: () => void;
-}) {
+}
+
+function ChallengeCardComponent({
+  challenge,
+  selected,
+  onSelect,
+  onToggleRelease,
+  onDelete,
+}: ChallengeCardProps) {
+  const isReleased = challenge.released;
+
   return (
     <div
       className={`bg-gray-900/70 border ${
@@ -40,10 +45,10 @@ export default function ChallengeCard({
 
           <p
             className={`text-sm font-semibold mt-1 ${
-              challenge.released ? "text-green-400" : "text-red-400"
+              isReleased ? "text-green-400" : "text-red-400"
             }`}
           >
-            {challenge.released ? "Released" : "Hidden"}
+            {isReleased ? "Released" : "Hidden"}
           </p>
         </div>
       </div>
@@ -52,13 +57,13 @@ export default function ChallengeCard({
         <button
           onClick={onToggleRelease}
           className={`px-4 py-2 rounded-md font-bold flex items-center gap-1 ${
-            challenge.released
+            isReleased
               ? "bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30"
               : "bg-green-500/20 text-green-400 border border-green-500/40 hover:bg-green-500/30"
           }`}
         >
-          {challenge.released ? <EyeOff /> : <Eye />}
-          {challenge.released ? "Hide" : "Release"}
+          {isReleased ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          {isReleased ? "Hide" : "Release"}
         </button>
 
         <button
@@ -71,3 +76,5 @@ export default function ChallengeCard({
     </div>
   );
 }
+
+export const ChallengeCard = memo(ChallengeCardComponent);

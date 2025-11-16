@@ -1,58 +1,59 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { LogOut } from 'lucide-react';
-import ConfirmModal from './ConfirmModal';
+import { useState, useCallback, useMemo } from "react";
+import { LogOut } from "lucide-react";
+import ConfirmModal from "./ConfirmModal";
 
 interface LogoutButtonProps {
-  /** Base backend API URL, ideally NEXT_PUBLIC_API_URL from env */
   backendURL?: string;
 }
 
-/**
- * LogoutButton
- * ------------
- * A small reusable component that:
- *  - Prompts the user to confirm logout
- *  - Sends logout request to backend
- *  - Clears session cookies
- *  - Redirects user to /login
- *
- * Uses ConfirmModal for consistent UI/UX across the app.
- */
 export default function LogoutButton({
-  backendURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api',
+  backendURL,
 }: LogoutButtonProps) {
+  // Memoize backend URL so it never triggers rerenders
+  const apiUrl = useMemo(
+    () => backendURL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api",
+    [backendURL]
+  );
+
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  /**
-   * Executes logout request to backend.
-   */
-  const handleLogout = async () => {
+  /* ---------------------------------------------------
+     Handlers (memoized to avoid unnecessary rerenders)
+  --------------------------------------------------- */
+
+  const openConfirm = useCallback(() => setShowConfirm(true), []);
+  const closeConfirm = useCallback(() => setShowConfirm(false), []);
+
+  const handleLogout = useCallback(async () => {
     setLoading(true);
 
     try {
-      await fetch(`${backendURL}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
+      await fetch(`${apiUrl}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
       });
 
-      // Force redirect to login page after logout
-      window.location.href = '/login';
+      // Hard redirect is correct for session kill
+      window.location.href = "/login";
     } catch (err) {
-      console.error('Logout failed:', err);
+      console.error("Logout failed:", err);
     } finally {
       setLoading(false);
       setShowConfirm(false);
     }
-  };
+  }, [apiUrl]);
+
+  /* ---------------------------------------------------
+     UI
+  --------------------------------------------------- */
 
   return (
     <>
-      {/* Logout button */}
       <button
-        onClick={() => setShowConfirm(true)}
+        onClick={openConfirm}
         disabled={loading}
         className="
           flex items-center gap-2 text-sm px-4 py-2 rounded font-semibold
@@ -61,7 +62,7 @@ export default function LogoutButton({
         "
       >
         <LogOut className="w-4 h-4" />
-        {loading ? 'Logging out…' : 'Logout'}
+        {loading ? "Logging out…" : "Logout"}
       </button>
 
       {/* Confirmation Modal */}
@@ -72,7 +73,7 @@ export default function LogoutButton({
         confirmText="Logout"
         cancelText="Cancel"
         onConfirm={handleLogout}
-        onCancel={() => setShowConfirm(false)}
+        onCancel={closeConfirm}
       />
     </>
   );

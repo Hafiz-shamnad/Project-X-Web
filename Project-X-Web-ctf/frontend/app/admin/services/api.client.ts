@@ -1,57 +1,107 @@
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+// Normalize base URL (removes trailing slashes)
+const BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api"
+).replace(/\/+$/, "");
 
-export async function apiClient(
-  endpoint: string,
-  options: RequestInit = {}
-) {
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
-    credentials: "include",
-    ...options,
-  });
-
-  let data;
+/* -------------------------------------------------------
+   Utility: Safe JSON parsing (never throws)
+------------------------------------------------------- */
+async function safeJsonParse(res: Response) {
+  const text = await res.text();
   try {
-    data = await res.json();
+    return JSON.parse(text);
   } catch {
-    data = null;
+    return text || null;
   }
-
-  if (!res.ok) {
-    throw new Error(data?.message || res.statusText);
-  }
-
-  return data;
 }
 
-export async function apiUpload(
+/* -------------------------------------------------------
+   Utility: Fetch with timeout (prevents stuck requests)
+------------------------------------------------------- */
+function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs = 15000
+): Promise<Response> {
+  return Promise.race([
+    fetch(url, options),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Request timeout")), timeoutMs)
+    ),
+  ]);
+}
+
+/* -------------------------------------------------------
+   Unified error extractor
+------------------------------------------------------- */
+function extractError(data: any, fallback: string) {
+  if (!data) return fallback;
+  if (typeof data === "string") return data;
+  if (typeof data.error === "string") return data.error;
+  if (typeof data.message === "string") return data.message;
+  return fallback;
+}
+
+/* -------------------------------------------------------
+   MAIN API CLIENT (JSON requests)
+------------------------------------------------------- */
+export async function apiClient<T = any>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const url =
+    BASE_URL + (endpoint.startsWith("/") ? endpoint : `/${endpoint}`);
+
+  const res = await fetchWithTimeout(
+    url,
+    {
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+      ...options,
+    },
+    15000
+  );
+
+  const data = await safeJsonParse(res);
+
+  if (!res.ok) {
+    throw new Error(extractError(data, res.statusText));
+  }
+
+  return data as T;
+}
+
+/* -------------------------------------------------------
+   UPLOAD CLIENT (FormData)
+------------------------------------------------------- */
+export async function apiUpload<T = any>(
   endpoint: string,
   formData: FormData,
   method: string = "POST"
-) {
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
-    method,
-    credentials: "include",
-    body: formData,
-  });
+): Promise<T> {
+  const url =
+    BASE_URL + (endpoint.startsWith("/") ? endpoint : `/${endpoint}`);
+
+  const res = await fetchWithTimeout(
+    url,
+    {
+      method,
+      credentials: "include",
+      body: formData,
+    },
+    20000
+  );
+
+  const data = await safeJsonParse(res);
 
   if (!res.ok) {
-    const text = await res.text();
-    let clean: any = {};
-
-    try {
-      clean = JSON.parse(text);
-    } catch {
-      // text was not JSON → ignore
-    }
-
-    const errorMessage =
-      (clean && typeof clean.error === "string" && clean.error) ||
-      text ||
-      "Unknown error";
-
-    throw new Error(errorMessage);
+    throw new Error(
+      extractError(data, res.statusText || "Upload failed")
+    );
   }
 
-  return res.json().catch(() => ({}));
+  return (data as T) || ({} as T);
 }

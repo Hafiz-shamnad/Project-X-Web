@@ -9,7 +9,8 @@ const {
   startChallenge,
   stopChallenge,
   getChallengeInstance,
-  spawnChallengeInstance
+  spawnChallengeInstance,
+  extendInstance
 } = require("../controllers/challengeController");
 
 const router = express.Router();
@@ -36,5 +37,7 @@ router.get("/:id", getChallengeById);
 // Starting/stopping a container requires login
 router.post("/start/:id", authenticate, startChallenge);
 router.post("/stop/:id", authenticate, stopChallenge);
+router.post("/extend/:id", authenticate, extendInstance);
+
 
 module.exports = router;
