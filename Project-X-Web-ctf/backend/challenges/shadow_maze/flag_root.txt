@@ -1,0 +1,1 @@
+FLAG{shadow_maze_root_pwning}

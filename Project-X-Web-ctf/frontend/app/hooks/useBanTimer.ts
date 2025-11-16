@@ -1,35 +1,68 @@
-// app/projectx/hooks/useBanTimer.ts
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatTime } from "../utils/formatTime";
 
 export function useBanTimer(bannedUntil: Date | null) {
-  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(
-    null
-  );
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (!bannedUntil) return;
+    // Clear old interval immediately (fastest possible cleanup)
+    const old = intervalRef.current;
+    if (old) clearInterval(old);
+
+    if (!bannedUntil) {
+      setRemainingSeconds(null);
+      intervalRef.current = null;
+      return;
+    }
+
+    const target = bannedUntil.getTime();
 
     const update = () => {
-      const now = Date.now();
-      const diff = Math.max(
-        0,
-        Math.floor((bannedUntil.getTime() - now) / 1000)
-      );
-      setRemainingSeconds(diff);
+      const diff = (target - Date.now()) / 1000;
+
+      // If expired → stop completely
+      if (diff <= 0) {
+        setRemainingSeconds(0);
+        const i = intervalRef.current;
+        if (i) clearInterval(i);
+        intervalRef.current = null;
+        return;
+      }
+
+      // Only update when value changes → prevents render spam
+      setRemainingSeconds((prev) => {
+        const next = Math.floor(diff);
+        return prev === next ? prev : next; // avoids unnecessary renders
+      });
     };
 
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [bannedUntil]);
+    update(); // initial execution
 
-  const timerDisplay =
-    remainingSeconds !== null ? formatTime(remainingSeconds) : "--:--";
+    // If already expired → no interval required
+    if (target <= Date.now()) {
+      intervalRef.current = null;
+      return;
+    }
+
+    // **1-second interval — optimal cadence**
+    intervalRef.current = setInterval(update, 1000);
+
+    return () => {
+      const i = intervalRef.current;
+      if (i) clearInterval(i);
+      intervalRef.current = null;
+    };
+  }, [bannedUntil]);
 
   const isActive = remainingSeconds !== null && remainingSeconds > 0;
 
-  return { remainingSeconds, timerDisplay, isActive };
+  return {
+    remainingSeconds,
+    timerDisplay:
+      remainingSeconds !== null ? formatTime(remainingSeconds) : "--:--",
+    isActive,
+  };
 }

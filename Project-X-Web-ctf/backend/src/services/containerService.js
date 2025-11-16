@@ -102,7 +102,51 @@ async function stopChallengeContainer(userId, challengeId) {
   return { status: "destroyed" };
 }
 
+/**
+ * Extend container expiry by +30 minutes (does NOT recreate container)
+ */
+async function extendChallengeContainer(userId, challengeId) {
+  const instance = await prisma.userContainer.findFirst({
+    where: { userId, challengeId },
+  });
+
+  if (!instance) {
+    return { error: "No active container" };
+  }
+
+  const now = new Date();
+  const currentRemaining = (new Date(instance.expiresAt).getTime() - now.getTime()) / 1000;
+
+  const MAX_TIME_SECONDS = 60 * 60; // 60 minutes
+
+  // Already at or above max time?
+  if (currentRemaining >= MAX_TIME_SECONDS) {
+    return { status: "max_reached", remainingSeconds: currentRemaining };
+  }
+
+  // How much we can extend?
+  const extendSeconds = 30 * 60; // 30 minutes
+  const newTotal = currentRemaining + extendSeconds;
+
+  // Clamp to max
+  const allowedNewTotal = Math.min(newTotal, MAX_TIME_SECONDS);
+
+  const newExpiry = new Date(now.getTime() + allowedNewTotal * 1000);
+
+  await prisma.userContainer.update({
+    where: { id: instance.id },
+    data: { expiresAt: newExpiry },
+  });
+
+  return {
+    status: "extended",
+    expiresAt: newExpiry,
+  };
+}
+
+
 module.exports = {
   startChallengeContainer,
   stopChallengeContainer,
+  extendChallengeContainer,
 };

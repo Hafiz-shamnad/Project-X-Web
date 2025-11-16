@@ -1,17 +1,10 @@
 "use client";
 
+import { memo } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { Team } from "../types/Team";
+import type { Team } from "../types/Team";
 
-export default function TeamCard({
-  team,
-  expanded,
-  onExpand,
-  onTemporaryBan,
-  onPermanentBan,
-  onUnban,
-  onPenalty,
-}: {
+interface TeamCardProps {
   team: Team;
   expanded: boolean;
   onExpand: () => void;
@@ -19,55 +12,82 @@ export default function TeamCard({
   onPermanentBan: () => void;
   onUnban: () => void;
   onPenalty: () => void;
-}) {
+}
+
+function TeamCardComponent({
+  team,
+  expanded,
+  onExpand,
+  onTemporaryBan,
+  onPermanentBan,
+  onUnban,
+  onPenalty,
+}: TeamCardProps) {
   return (
-    <div className="bg-gray-900/60 border border-green-500/30 rounded-xl p-5 hover:border-green-500/50 transition-all">
+    <div
+      className="
+        bg-slate-900/60 
+        border border-blue-600/30 
+        rounded-2xl 
+        p-5 
+        shadow-lg 
+        hover:border-blue-500/60 
+        transition-all
+      "
+    >
       {/* Header */}
-      <div
-        className="flex justify-between items-center cursor-pointer"
+      <button
         onClick={onExpand}
+        className="flex justify-between items-center w-full text-left"
       >
         <div>
           <h3 className="text-white font-bold">{team.name}</h3>
 
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-slate-400">
             Score:{" "}
-            <span className="text-green-400 font-semibold">
+            <span className="text-blue-400 font-semibold">
               {team.totalScore ?? 0}
             </span>{" "}
             | Solves:{" "}
-            <span className="text-yellow-400">
+            <span className="text-cyan-400 font-semibold">
               {team.solvedCount ?? 0}
             </span>
           </p>
         </div>
 
         {expanded ? (
-          <ChevronUp className="w-6 h-6 text-green-400" />
+          <ChevronUp className="w-6 h-6 text-blue-400" />
         ) : (
-          <ChevronDown className="w-6 h-6 text-gray-400" />
+          <ChevronDown className="w-6 h-6 text-slate-400" />
         )}
-      </div>
+      </button>
 
-      {/* Expanded section */}
+      {/* Expanded Section */}
       {expanded && (
-        <div className="mt-4 border-t border-gray-800 pt-4 space-y-3">
+        <div className="mt-4 border-t border-slate-800 pt-4 space-y-4 animate-fade-in">
           {/* Members */}
           <div>
-            <p className="text-sm text-gray-400">Members:</p>
+            <p className="text-sm text-slate-400">Members:</p>
 
             <div className="flex flex-wrap gap-2 mt-2">
-              {team.members && team.members.length > 0 ? (
+              {team.members?.length ? (
                 team.members.map((m) => (
                   <span
                     key={m.id}
-                    className="px-3 py-1 bg-gray-800 text-gray-200 rounded-lg border border-gray-700 text-sm"
+                    className="
+                      px-3 py-1 
+                      bg-slate-800 
+                      text-slate-200 
+                      rounded-lg 
+                      border border-slate-700 
+                      text-sm
+                    "
                   >
                     {m.username}
                   </span>
                 ))
               ) : (
-                <span className="text-gray-500 text-sm">
+                <span className="text-slate-500 text-sm">
                   No members yet
                 </span>
               )}
@@ -76,36 +96,72 @@ export default function TeamCard({
 
           {/* Actions */}
           <div className="flex gap-3 flex-wrap mt-3">
+
             <button
               onClick={onTemporaryBan}
-              className="bg-red-600/20 text-red-400 border border-red-500/30 px-4 py-1 rounded-md hover:bg-red-600/30"
+              className="
+                bg-rose-600/20 
+                text-rose-400 
+                border border-rose-500/30 
+                px-4 py-1 
+                rounded-md 
+                hover:bg-rose-600/30 
+                transition
+              "
             >
               Temporary Ban
             </button>
 
             <button
               onClick={onPermanentBan}
-              className="bg-red-900/30 text-red-400 border border-red-700/30 px-4 py-1 rounded-md hover:bg-red-900/40"
+              className="
+                bg-red-900/20 
+                text-red-400 
+                border border-red-700/30 
+                px-4 py-1 
+                rounded-md 
+                hover:bg-red-900/30 
+                transition
+              "
             >
               Permanent Ban
             </button>
 
             <button
               onClick={onUnban}
-              className="bg-yellow-600/20 text-yellow-400 border border-yellow-500/30 px-4 py-1 rounded-md hover:bg-yellow-600/30"
+              className="
+                bg-yellow-600/20 
+                text-yellow-400 
+                border border-yellow-500/30 
+                px-4 py-1 
+                rounded-md 
+                hover:bg-yellow-600/30 
+                transition
+              "
             >
               Unban
             </button>
 
             <button
               onClick={onPenalty}
-              className="bg-blue-600/20 text-blue-400 border border-blue-500/30 px-4 py-1 rounded-md hover:bg-blue-600/30"
+              className="
+                bg-blue-600/20 
+                text-blue-400 
+                border border-blue-500/30 
+                px-4 py-1 
+                rounded-md 
+                hover:bg-blue-600/30 
+                transition
+              "
             >
               Penalty
             </button>
+
           </div>
         </div>
       )}
     </div>
   );
 }
+
+export default memo(TeamCardComponent);

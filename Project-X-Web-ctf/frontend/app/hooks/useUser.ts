@@ -1,4 +1,3 @@
-// app/projectx/hooks/useUser.ts
 "use client";
 
 import { useEffect, useState } from "react";
@@ -9,55 +8,78 @@ export interface UserProfile {
   bannedUntil: string | null;
 }
 
+interface UserState {
+  user: UserProfile | null;
+  bannedDate: Date | null;
+  isTempBanned: boolean;
+  isPermanentBanned: boolean;
+}
+
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
 export function useUser() {
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [state, setState] = useState<UserState>({
+    user: null,
+    bannedDate: null,
+    isTempBanned: false,
+    isPermanentBanned: false,
+  });
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const getUser = async () => {
+    let cancelled = false;
+
+    (async () => {
       try {
         const res = await fetch(`${BACKEND_URL}/auth/me`, {
           credentials: "include",
         });
         const data = await res.json();
 
-        if (data.user?.username) {
-          setUser({
-            username: data.user.username,
-            teamId: data.user.teamId ?? null,
-            bannedUntil: data.user.bannedUntil ?? null,
+        if (!data.user?.username) {
+          if (!cancelled) setLoading(false);
+          return;
+        }
+
+        const bannedUntil = data.user.bannedUntil ?? null;
+        const bannedDate = bannedUntil ? new Date(bannedUntil) : null;
+
+        const isPermanentBanned =
+          bannedDate !== null && bannedDate.getFullYear() >= 9999;
+
+        const isTempBanned =
+          bannedDate !== null &&
+          !isPermanentBanned &&
+          bannedDate.getTime() > Date.now();
+
+        if (!cancelled) {
+          setState({
+            user: {
+              username: data.user.username,
+              teamId: data.user.teamId ?? null,
+              bannedUntil,
+            },
+            bannedDate,
+            isTempBanned,
+            isPermanentBanned,
           });
         }
       } catch (err) {
         console.error("Error fetching user:", err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    };
+    })();
 
-    getUser();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const bannedDate = user?.bannedUntil
-    ? new Date(user.bannedUntil)
-    : null;
-
-  const isPermanentBanned =
-    bannedDate && bannedDate.getFullYear() >= 9999;
-
-  const isTempBanned =
-    bannedDate &&
-    !isPermanentBanned &&
-    bannedDate.getTime() > Date.now();
-
   return {
-    user,
+    ...state,
     loading,
-    bannedDate,
-    isTempBanned,
-    isPermanentBanned,
   };
 }

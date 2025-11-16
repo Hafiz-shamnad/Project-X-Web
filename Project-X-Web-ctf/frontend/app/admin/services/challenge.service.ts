@@ -1,17 +1,28 @@
 import { apiClient, apiUpload } from "./api.client";
 
 export const ChallengeService = {
-  list: () => apiClient("/admin/challenges"),
+  /** Get all challenges */
+  list() {
+    return apiClient("/admin/challenges");
+  },
 
-  create: (fd: FormData) => apiUpload("/admin/challenge", fd, "POST"),
+  /** Create challenge using FormData */
+  create(fd: FormData) {
+    return apiUpload("/admin/challenge", fd, "POST");
+  },
 
-  delete: (id: number) =>
-    apiClient(`/admin/challenge/${id}`, { method: "DELETE" }),
+  /** Delete a challenge by ID */
+  delete(id: number) {
+    return apiClient(`/admin/challenge/${id}`, {
+      method: "DELETE",
+    });
+  },
 
-  toggle: (id: number, released: boolean) =>
-    apiClient(`/admin/challenge/${id}/toggle`, {
+  /** Toggle release state */
+  toggle(id: number, released: boolean) {
+    return apiClient(`/admin/challenge/${id}/toggle`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ released }),
-    }),
+    });
+  },
 };

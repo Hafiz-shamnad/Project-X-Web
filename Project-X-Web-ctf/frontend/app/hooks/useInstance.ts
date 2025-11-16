@@ -17,12 +17,12 @@ interface InstanceInfo {
 
 export function useInstance(selectedChallenge: Challenge | null) {
   const [instance, setInstance] = useState<InstanceInfo | null>(null);
-  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(
-    null
-  );
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [spawnLoading, setSpawnLoading] = useState(false);
 
-  // Restore existing instance for selected challenge
+  /* ----------------------------------------------------------
+   * Restore (load) existing instance
+   * ---------------------------------------------------------- */
   useEffect(() => {
     if (!selectedChallenge) {
       setInstance(null);
@@ -33,9 +33,13 @@ export function useInstance(selectedChallenge: Challenge | null) {
     const fetchInstance = async () => {
       try {
         const res = await fetch(
-          `${BACKEND_URL}/challenges/instance/${selectedChallenge.id}`,
-          { credentials: "include" }
+          `${BACKEND_URL}/challenges/instance/${selectedChallenge.id}?t=${Date.now()}`,
+          {
+            credentials: "include",
+            cache: "no-store",
+          }
         );
+
         const data = await res.json();
 
         if (data.status === "running") {
@@ -47,9 +51,7 @@ export function useInstance(selectedChallenge: Challenge | null) {
 
           const diff = Math.max(
             0,
-            Math.floor(
-              (new Date(data.expiresAt).getTime() - Date.now()) / 1000
-            )
+            Math.floor((new Date(data.expiresAt).getTime() - Date.now()) / 1000)
           );
           setRemainingSeconds(diff);
         } else {
@@ -64,14 +66,15 @@ export function useInstance(selectedChallenge: Challenge | null) {
     fetchInstance();
   }, [selectedChallenge]);
 
-  // Countdown
+  /* ----------------------------------------------------------
+   * Countdown timer
+   * ---------------------------------------------------------- */
   useEffect(() => {
     if (!remainingSeconds) return;
 
     const interval = setInterval(() => {
       setRemainingSeconds((sec) => {
-        if (sec === null) return null;
-        if (sec <= 0) {
+        if (sec === null || sec <= 0) {
           setInstance(null);
           return null;
         }
@@ -82,13 +85,21 @@ export function useInstance(selectedChallenge: Challenge | null) {
     return () => clearInterval(interval);
   }, [remainingSeconds]);
 
+  /* ----------------------------------------------------------
+   * Spawn environment
+   * ---------------------------------------------------------- */
   const spawn = async (challengeId: number) => {
     setSpawnLoading(true);
     try {
       const res = await fetch(
         `${BACKEND_URL}/challenges/spawn/${challengeId}`,
-        { method: "POST", credentials: "include" }
+        {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+        }
       );
+
       const data = await res.json();
 
       if (data.status === "created" || data.status === "running") {
@@ -100,11 +111,10 @@ export function useInstance(selectedChallenge: Challenge | null) {
 
         const diff = Math.max(
           0,
-          Math.floor(
-            (new Date(data.expiresAt).getTime() - Date.now()) / 1000
-          )
+          Math.floor((new Date(data.expiresAt).getTime() - Date.now()) / 1000)
         );
         setRemainingSeconds(diff);
+
         toast.success("Challenge environment ready!");
       } else {
         toast.error("Failed to start environment");
@@ -117,12 +127,20 @@ export function useInstance(selectedChallenge: Challenge | null) {
     }
   };
 
+  /* ----------------------------------------------------------
+   * Stop environment
+   * ---------------------------------------------------------- */
   const stop = async (challengeId: number) => {
     try {
       const res = await fetch(
         `${BACKEND_URL}/challenges/stop/${challengeId}`,
-        { method: "POST", credentials: "include" }
+        {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+        }
       );
+
       const data = await res.json();
 
       if (data.status === "destroyed") {
@@ -139,6 +157,47 @@ export function useInstance(selectedChallenge: Challenge | null) {
     }
   };
 
+  /* ----------------------------------------------------------
+   * Extend expiry by +30 mins
+   * ---------------------------------------------------------- */
+  const extend = async (challengeId: number): Promise<boolean> => {
+    try {
+      const res = await fetch(
+        `${BACKEND_URL}/challenges/extend/${challengeId}`,
+        { method: "POST", credentials: "include" }
+      );
+
+      const data = await res.json();
+
+      if (data.status === "max_reached") {
+        toast.error("Maximum allowed time (60 minutes) reached");
+        return false;
+      }
+
+      if (data.status === "extended") {
+        if (instance) {
+          setInstance({
+            ...instance,
+            expiresAt: data.expiresAt,
+          });
+        }
+
+        const diff = Math.max(
+          0,
+          Math.floor(
+            (new Date(data.expiresAt).getTime() - Date.now()) / 1000
+          )
+        );
+        setRemainingSeconds(diff);
+        return true;
+      }
+    } catch (err) {
+      console.error("Error extending:", err);
+    }
+
+    return false;
+  };
+
   return {
     instance,
     spawnLoading,
@@ -147,5 +206,6 @@ export function useInstance(selectedChallenge: Challenge | null) {
       remainingSeconds !== null ? formatTime(remainingSeconds) : "Expired",
     spawn,
     stop,
+    extend,
   };
 }

@@ -1,58 +1,83 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 
 export function useAdminModals() {
-  const [confirm, setConfirm] = useState<{
-    open: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => Promise<void>;
-  }>({
+  /* ----------------------------------------
+     CONFIRM MODAL STATE
+  ---------------------------------------- */
+  const [confirmState, setConfirmState] = useState({
     open: false,
     title: "",
     message: "",
     onConfirm: async () => {},
   });
 
-  const [input, setInput] = useState<{
-    open: boolean;
-    title: string;
-    message: string;
-    label: string;
-    onConfirm: (value: string) => Promise<void>;
-  }>({
+  const openConfirm = useCallback(
+    (
+      title: string,
+      message: string,
+      onConfirm: () => Promise<void>
+    ) => {
+      setConfirmState({
+        open: true,
+        title,
+        message,
+        onConfirm, // safe: stored synchronously & memoized call below
+      });
+    },
+    []
+  );
+
+  const closeConfirm = useCallback(() => {
+    setConfirmState((prev) => ({ ...prev, open: false }));
+  }, []);
+
+  /* ----------------------------------------
+     INPUT MODAL STATE
+  ---------------------------------------- */
+  const [inputState, setInputState] = useState({
     open: false,
     title: "",
     message: "",
     label: "",
-    onConfirm: async () => {},
+    onConfirm: async (_val: string) => {},
   });
 
-  const openConfirm = (
-    title: string,
-    message: string,
-    onConfirm: () => Promise<void>
-  ) => setConfirm({ open: true, title, message, onConfirm });
+  const openInput = useCallback(
+    (
+      title: string,
+      message: string,
+      label: string,
+      onConfirm: (value: string) => Promise<void>
+    ) => {
+      setInputState({
+        open: true,
+        title,
+        message,
+        label,
+        onConfirm,
+      });
+    },
+    []
+  );
 
-  const closeConfirm = () =>
-    setConfirm((prev) => ({
-      ...prev,
-      open: false,
-    }));
+  const closeInput = useCallback(() => {
+    setInputState((prev) => ({ ...prev, open: false }));
+  }, []);
 
-  const openInput = (
-    title: string,
-    message: string,
-    label: string,
-    onConfirm: (value: string) => Promise<void>
-  ) => setInput({ open: true, title, message, label, onConfirm });
-
-  const closeInput = () =>
-    setInput((prev) => ({
-      ...prev,
-      open: false,
-    }));
-
-  return { confirm, input, openConfirm, openInput, closeConfirm, closeInput };
+  /* ----------------------------------------
+     MEMOIZED RETURN OBJECT (prevents rerenders)
+  ---------------------------------------- */
+  return useMemo(
+    () => ({
+      confirm: confirmState,
+      input: inputState,
+      openConfirm,
+      closeConfirm,
+      openInput,
+      closeInput,
+    }),
+    [confirmState, inputState, openConfirm, closeConfirm, openInput, closeInput]
+  );
 }

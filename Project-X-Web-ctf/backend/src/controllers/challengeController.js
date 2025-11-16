@@ -19,6 +19,7 @@ const { prisma } = require("../config/db");
 const {
   startChallengeContainer,
   stopChallengeContainer,
+  extendChallengeContainer
 } = require("../services/containerService");
 
 /* -------------------------------------------------------------------------- */
@@ -246,5 +247,22 @@ exports.spawnChallengeInstance = async (req, res) => {
   } catch (err) {
     console.error("Spawn error:", err);
     res.status(500).json({ error: "Server error" });
+  }
+};
+
+
+exports.extendInstance = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const challengeId = Number(req.params.id);
+
+    const result = await extendChallengeContainer(userId, challengeId);
+
+    if (result.error) return res.status(400).json(result);
+
+    return res.json(result);
+  } catch (err) {
+    console.error("Extend error:", err);
+    return res.status(500).json({ error: "Failed to extend instance" });
   }
 };
