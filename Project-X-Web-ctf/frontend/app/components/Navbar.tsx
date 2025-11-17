@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Shield, Users, Lock, User, Menu, X } from "lucide-react";
+import { Shield, Users, Lock, User, Menu, X, Trophy } from "lucide-react";
 import { useEffect, useState, useRef, useCallback } from "react";
 import LogoutButton from "./LogoutButton";
 import { BACKEND_URL } from "../utils/constants";
@@ -32,7 +32,9 @@ const NavItemComponent = ({
         : "text-blue-400 hover:text-blue-300 hover:bg-blue-900/40"
     }`}
   >
-    <Icon className={`w-4 h-4 transition ${!active ? "group-hover:scale-110" : ""}`} />
+    <Icon
+      className={`w-4 h-4 transition ${!active ? "group-hover:scale-110" : ""}`}
+    />
     {label}
   </Link>
 );
@@ -160,39 +162,76 @@ export default function Navbar() {
           {/* DESKTOP NAV */}
           <div className="hidden md:flex items-center gap-3 text-sm">
             {NavItem("/dashboard", "CTF Arena", Shield)}
-            {NavItem("/team", "Team", Users)}
-            {user?.role === "admin" && NavItem("/admin", "Admin", Lock)}
+            {NavItem("/leaderboard", "Leaderboard", Trophy)}
           </div>
 
           {/* USER DROPDOWN */}
           <div className="hidden md:block relative" ref={dropdownRef}>
             <button
               onClick={toggleDropdown}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition ${
-                openMenu
-                  ? "bg-blue-900/40 text-blue-300 border border-blue-500/40"
-                  : "text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
-              }`}
+              className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-all
+      ${
+        openMenu
+          ? "bg-blue-900/40 text-blue-300 border border-blue-500/40 shadow-lg shadow-blue-500/10"
+          : "text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
+      }`}
             >
-              <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-black font-bold">
+              {/* Avatar */}
+              <div
+                className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 
+        flex items-center justify-center text-black font-semibold shadow-md"
+              >
                 {user ? user.username[0].toUpperCase() : "?"}
               </div>
-              <span>{user?.username || "guest"}</span>
+
+              {/* Username */}
+              <span className="font-semibold text-blue-300">
+                {user?.username || "guest"}
+              </span>
             </button>
 
+            {/* DROPDOWN MENU */}
             {openMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-slate-900/95 backdrop-blur-xl border border-blue-500/40 rounded-lg shadow-xl">
+              <div
+                className="absolute right-0 mt-3 w-60 bg-slate-900/95 backdrop-blur-xl 
+        border border-blue-500/30 rounded-xl shadow-2xl py-2 animate-in fade-in-0 zoom-in-95"
+              >
+                {/* Profile */}
                 <Link
                   href="/profile"
                   onClick={() => setOpenMenu(false)}
-                  className="flex items-center gap-2 px-4 py-3 text-blue-400 hover:bg-blue-900/30"
+                  className="flex items-center gap-3 px-4 py-2.5 text-blue-300 hover:bg-blue-900/40 rounded-md"
                 >
                   <User className="w-4 h-4" />
                   Profile
                 </Link>
 
-                <div className="border-t border-blue-800/40" />
-                <div className="p-2">
+                {/* My Teams (NEW) */}
+                <Link
+                  href="/team"
+                  onClick={() => setOpenMenu(false)}
+                  className="flex items-center gap-3 px-4 py-2.5 text-blue-300 hover:bg-blue-900/40 rounded-md"
+                >
+                  <Users className="w-4 h-4" />
+                  My Teams
+                </Link>
+
+                {/* Admin (conditional) */}
+                {user?.role === "admin" && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setOpenMenu(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 text-blue-300 hover:bg-blue-900/40 rounded-md"
+                  >
+                    <Lock className="w-4 h-4" />
+                    Admin Panel
+                  </Link>
+                )}
+
+                <div className="border-t border-blue-800/40 my-2" />
+
+                {/* Logout */}
+                <div className="px-3 py-1.5">
                   <LogoutButton backendURL={BACKEND_URL} />
                 </div>
               </div>
@@ -224,14 +263,16 @@ export default function Navbar() {
                 {user ? user.username[0].toUpperCase() : "?"}
               </div>
               <div>
-                <p className="text-blue-300 font-semibold">{user?.username || "Guest"}</p>
+                <p className="text-blue-300 font-semibold">
+                  {user?.username || "Guest"}
+                </p>
                 <p className="text-xs text-blue-500/70">{user?.role}</p>
               </div>
             </div>
 
             {/* NAV ITEMS */}
             {NavItem("/dashboard", "CTF Arena", Shield)}
-            {NavItem("/team", "Team", Users)}
+            {NavItem("/leaderboard", "Leaderboard", Trophy)}
             {user?.role === "admin" && NavItem("/admin", "Admin", Lock)}
 
             <div className="border-t border-blue-800/40 my-4" />
@@ -243,6 +284,15 @@ export default function Navbar() {
             >
               <User className="w-4 h-4" />
               Profile
+            </Link>
+
+            <Link
+              href="/leaderboard"
+              onClick={() => setOpenMenu(false)}
+              className="flex items-center gap-3 px-4 py-2.5 text-cyan-300 hover:bg-cyan-900/40 rounded-md"
+            >
+              <Trophy className="w-4 h-4" />
+              Leaderboard
             </Link>
 
             <div className="pt-3">

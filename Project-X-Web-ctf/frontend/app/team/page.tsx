@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from "react";
 import {
   Users,
   Copy,
@@ -11,15 +11,10 @@ import {
   Check,
   Sparkles,
   Shield,
-} from 'lucide-react';
-import { apiFetch } from '@/lib/api';
-import Leaderboard from '../components/Leaderboard';
-
-interface Member {
-  id: number;
-  username: string;
-  points?: number;
-}
+} from "lucide-react";
+import { apiFetch } from "@/lib/api";
+import TeamInsights from "../components/TeamInsights";
+import type { Member } from "../components/TeamInsights";
 
 interface Team {
   id: number;
@@ -31,8 +26,8 @@ interface Team {
 
 export default function TeamPage() {
   const [team, setTeam] = useState<Team | null>(null);
-  const [teamName, setTeamName] = useState('');
-  const [joinCode, setJoinCode] = useState('');
+  const [teamName, setTeamName] = useState("");
+  const [joinCode, setJoinCode] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -57,7 +52,7 @@ export default function TeamPage() {
     setError(null);
 
     try {
-      const res = await apiFetch('/team/me');
+      const res = await apiFetch("/team/me");
 
       if (!res.team || res.error) {
         setTeam(null);
@@ -72,7 +67,7 @@ export default function TeamPage() {
         });
       }
     } catch {
-      setError('Failed to load team.');
+      setError("Failed to load team.");
       setTeam(null);
     } finally {
       setLoading(false);
@@ -83,27 +78,27 @@ export default function TeamPage() {
    * CREATE TEAM
    * --------------------------------------------- */
   const createTeam = useCallback(async () => {
-    if (!teamName.trim()) return setError('Team name required.');
+    if (!teamName.trim()) return setError("Team name required.");
 
     setSaving(true);
     setError(null);
 
     try {
-      const res = await apiFetch('/team/create', {
-        method: 'POST',
+      const res = await apiFetch("/team/create", {
+        method: "POST",
         body: JSON.stringify({ name: teamName }),
       });
 
       if (res.error) setError(res.error);
       else {
-        showSuccess('Team created.');
+        showSuccess("Team created.");
         fetchMyTeam();
       }
     } catch {
-      setError('Server error.');
+      setError("Server error.");
     } finally {
       setSaving(false);
-      setTeamName('');
+      setTeamName("");
     }
   }, [teamName, fetchMyTeam, showSuccess]);
 
@@ -111,27 +106,27 @@ export default function TeamPage() {
    * JOIN TEAM
    * --------------------------------------------- */
   const joinTeam = useCallback(async () => {
-    if (!joinCode.trim()) return setError('Join code required.');
+    if (!joinCode.trim()) return setError("Join code required.");
 
     setSaving(true);
     setError(null);
 
     try {
-      const res = await apiFetch('/team/join', {
-        method: 'POST',
+      const res = await apiFetch("/team/join", {
+        method: "POST",
         body: JSON.stringify({ joinCode }),
       });
 
       if (res.error) setError(res.error);
       else {
-        showSuccess('Joined team.');
+        showSuccess("Joined team.");
         fetchMyTeam();
       }
     } catch {
-      setError('Server error.');
+      setError("Server error.");
     } finally {
       setSaving(false);
-      setJoinCode('');
+      setJoinCode("");
     }
   }, [joinCode, fetchMyTeam, showSuccess]);
 
@@ -170,7 +165,6 @@ export default function TeamPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a0f1f] to-[#0d1b2a] text-blue-200 p-6">
       <div className="max-w-5xl mx-auto">
-
         {/* SUCCESS */}
         {success && (
           <div className="mb-5 bg-blue-900/30 border border-blue-400/40 p-3 rounded-lg flex items-center gap-2 text-blue-200">
@@ -191,7 +185,6 @@ export default function TeamPage() {
           <>
             {/* TEAM CARD */}
             <div className="p-6 rounded-2xl bg-[#0b1428]/70 backdrop-blur-xl border border-blue-500/20 shadow-xl shadow-blue-900/40 mb-10">
-
               {/* Header */}
               <div className="flex justify-between items-center mb-4">
                 <h1 className="text-3xl font-bold text-blue-200 flex items-center gap-2">
@@ -226,32 +219,25 @@ export default function TeamPage() {
                     onClick={copyJoin}
                     className="px-3 py-1 border border-blue-500/30 rounded hover:bg-blue-900/30 transition"
                   >
-                    {copied ? 'Copied' : 'Copy'}
+                    {copied ? "Copied" : "Copy"}
                   </button>
                 </div>
               )}
             </div>
 
             {/* Members & Leaderboard */}
-            <Leaderboard
-              backendUrl={
-                process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'
-              }
-              teamId={team.id}
-            />
+            <TeamInsights members={team.members || []} />
           </>
         ) : (
           /* ---------------------------------------------
            * NO TEAM — JOIN OR CREATE
            * --------------------------------------------- */
           <div className="text-center mt-20 space-y-10">
-
             <h2 className="text-3xl font-bold text-blue-200">
               Join or Create a Team
             </h2>
 
             <div className="grid sm:grid-cols-2 gap-8">
-
               {/* Create Team */}
               <div className="p-6 rounded-xl bg-[#0b1428]/70 border border-blue-500/20 backdrop-blur-xl shadow shadow-blue-900/30">
                 <h3 className="font-bold text-xl mb-3 flex items-center gap-2 text-blue-300">
@@ -270,7 +256,7 @@ export default function TeamPage() {
                   onClick={createTeam}
                   className="w-full py-3 rounded-lg font-semibold bg-blue-500 text-black hover:bg-blue-400 disabled:opacity-50 transition"
                 >
-                  {saving ? 'Creating...' : 'Create'}
+                  {saving ? "Creating..." : "Create"}
                 </button>
               </div>
 
@@ -292,7 +278,7 @@ export default function TeamPage() {
                   onClick={joinTeam}
                   className="w-full py-3 rounded-lg font-semibold bg-blue-500 text-black hover:bg-blue-400 disabled:opacity-50 transition"
                 >
-                  {saving ? 'Joining...' : 'Join'}
+                  {saving ? "Joining..." : "Join"}
                 </button>
               </div>
             </div>

@@ -18,7 +18,6 @@ export default function ChallengeList({
   selected,
   onSelect,
 }: ChallengeListProps) {
-
   // ----------------------------------------
   // MEMO: Grouped & Sorted Challenges
   // ----------------------------------------
@@ -118,7 +117,9 @@ export default function ChallengeList({
             {isSolved && (
               <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-500/15 border border-emerald-500/40 px-2.5 py-0.5 rounded-full">
                 <CheckCircle2 className="w-3 h-3" />
-                <span className="text-[10px] font-bold tracking-wide">SOLVED</span>
+                <span className="text-[10px] font-bold tracking-wide">
+                  SOLVED
+                </span>
               </div>
             )}
           </div>
@@ -132,8 +133,7 @@ export default function ChallengeList({
   // Render
   // ----------------------------------------
   return (
-    <aside className="md:w-1/3 lg:w-1/4 bg-gradient-to-b from-slate-900/40 to-slate-950/60 backdrop-blur-2xl border-r border-blue-500/20 overflow-y-auto shadow-2xl">
-
+    <aside className="w-full h-full bg-slate-900/40 border-r border-blue-500/20 overflow-y-auto">
       {/* Header */}
       <div className="p-5 border-b border-blue-500/20 sticky top-0 bg-slate-950/80 backdrop-blur-xl z-10">
         <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 flex items-center gap-2.5">
