@@ -9,7 +9,9 @@ interface ChallengeEnvironmentProps {
   challenge: Challenge;
 }
 
-export default function ChallengeEnvironment({ challenge }: ChallengeEnvironmentProps) {
+export default function ChallengeEnvironment({
+  challenge,
+}: ChallengeEnvironmentProps) {
   const {
     instance,
     spawnLoading,
@@ -34,10 +36,20 @@ export default function ChallengeEnvironment({ challenge }: ChallengeEnvironment
 
   const handleExtend = async () => {
     const ok = await extend(challenge.id);
-    toast[ok ? "success" : "error"](ok ? "Extended (max 60 min reached)" : "Cannot extend further");
+    toast[ok ? "success" : "error"](
+      ok ? "Extended (max 60 min reached)" : "Cannot extend further"
+    );
   };
 
-  const handleStop = () => stop(challenge.id);
+  const handleStop = () => {
+    // ⚡ Instantly remove environment from UI
+    stop(challenge.id, { immediate: true });
+
+    // 🔥 Backend request executes silently without blocking UI
+    requestAnimationFrame(() => {
+      stop(challenge.id);
+    });
+  };
 
   // ------------------------------
   // Button States
@@ -94,19 +106,21 @@ export default function ChallengeEnvironment({ challenge }: ChallengeEnvironment
       {/* ------------------------------ */}
       {instance && (
         <div className="mt-6 p-6 bg-slate-950/60 border border-emerald-500/30 rounded-2xl backdrop-blur-xl space-y-4 shadow-lg shadow-emerald-500/10">
-          
           {/* Header */}
           <div className="flex items-center gap-3 mb-4">
             <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse shadow-lg shadow-emerald-400/50" />
-            <h3 className="text-xl font-bold text-emerald-300">Instance Running</h3>
+            <h3 className="text-xl font-bold text-emerald-300">
+              Instance Running
+            </h3>
           </div>
 
           {/* Info Panel */}
           <div className="space-y-3 p-4 bg-slate-950/60 rounded-xl border border-blue-500/20">
-
             {/* URL */}
             <div>
-              <span className="text-sm text-slate-500 block mb-1">Access URL</span>
+              <span className="text-sm text-slate-500 block mb-1">
+                Access URL
+              </span>
               <a
                 href={instance.url}
                 target="_blank"
@@ -120,7 +134,9 @@ export default function ChallengeEnvironment({ challenge }: ChallengeEnvironment
             {/* Remaining Time */}
             <div className="flex items-center justify-between pt-3 border-t border-blue-500/20">
               <span className="text-sm text-slate-400">Remaining Time</span>
-              <span className="text-emerald-400 font-bold text-xl font-mono">{timeDisplay}</span>
+              <span className="text-emerald-400 font-bold text-xl font-mono">
+                {timeDisplay}
+              </span>
             </div>
           </div>
 

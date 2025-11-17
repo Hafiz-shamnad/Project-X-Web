@@ -127,35 +127,44 @@ export function useInstance(selectedChallenge: Challenge | null) {
     }
   };
 
-  /* ----------------------------------------------------------
-   * Stop environment
-   * ---------------------------------------------------------- */
-  const stop = async (challengeId: number) => {
-    try {
-      const res = await fetch(
-        `${BACKEND_URL}/challenges/stop/${challengeId}`,
-        {
-          method: "POST",
-          credentials: "include",
-          cache: "no-store",
-        }
-      );
+/* ----------------------------------------------------------
+ * Stop environment (Optimistic UI)
+ * ---------------------------------------------------------- */
+const stop = async (challengeId: number, opts?: { immediate?: boolean }) => {
+  // ⚡ Instantly update UI BEFORE calling the backend
+  if (opts?.immediate) {
+    setInstance(null);
+    setRemainingSeconds(null);
+    return;
+  }
 
-      const data = await res.json();
-
-      if (data.status === "destroyed") {
-        toast.success("Environment stopped successfully!");
-      } else {
-        toast("Environment already stopped.");
+  // Backend call in background
+  try {
+    const res = await fetch(
+      `${BACKEND_URL}/challenges/stop/${challengeId}`,
+      {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
       }
+    );
 
-      setInstance(null);
-      setRemainingSeconds(null);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to stop environment");
+    const data = await res.json();
+
+    if (data.status === "destroyed") {
+      toast.success("Environment stopped successfully!");
+    } else {
+      toast("Environment already stopped.");
     }
-  };
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to stop environment");
+  } finally {
+    setInstance(null);
+    setRemainingSeconds(null);
+  }
+};
+
 
   /* ----------------------------------------------------------
    * Extend expiry by +30 mins

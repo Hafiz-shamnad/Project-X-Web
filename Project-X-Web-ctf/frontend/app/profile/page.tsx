@@ -11,8 +11,12 @@ import {
   Edit3,
   Save,
   X,
+  Award,
+  Calendar,
+  Target,
+  Sparkles,
+  CheckCircle2,
 } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
 
 interface Profile {
   id: number;
@@ -35,6 +39,19 @@ interface ProfileForm {
   bio: string;
   country: string;
   avatarUrl: string;
+}
+
+// API helper function
+async function apiFetch(endpoint: string, options?: any) {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+  const res = await fetch(`${baseUrl}${endpoint}`, {
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    ...options,
+  });
+  return res.json();
 }
 
 export default function ProfilePage() {
@@ -97,165 +114,246 @@ export default function ProfilePage() {
    * ---------------------------------------------------------------------- */
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0a0f1f] text-blue-300">
-        <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-        Loading profile...
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto"></div>
+          <p className="text-blue-400 text-lg font-mono">Loading profile...</p>
+        </div>
       </div>
     );
   }
 
   if (!profile) {
     return (
-      <div className="text-center p-10 text-blue-300 bg-[#0a0f1f]">
-        No profile found. Please log in.
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 flex items-center justify-center">
+        <div className="text-center p-10 rounded-2xl bg-slate-900/50 border border-blue-500/30 backdrop-blur-sm">
+          <User className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+          <p className="text-blue-300 text-lg">No profile found. Please log in.</p>
+        </div>
       </div>
     );
   }
 
   /* ----------------------------------------------------------------------
-   * MAIN UI — Blue Theme
+   * MAIN UI
    * ---------------------------------------------------------------------- */
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0f1f] to-[#0d1b2a] text-blue-300 p-6">
-      <div className="max-w-3xl mx-auto bg-[#0b1428]/70 backdrop-blur-lg border border-blue-500/30 shadow-xl shadow-blue-900/30 rounded-xl p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+      </div>
 
-        {/* HEADER */}
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-blue-200">&gt; Profile</h1>
-
-          {!editing ? (
-            <button
-              onClick={() => setEditing(true)}
-              className="flex items-center gap-2 px-3 py-1 text-sm border border-blue-500 rounded hover:bg-blue-900/30 transition"
-            >
-              <Edit3 className="w-4 h-4" />
-              Edit
-            </button>
-          ) : (
-            <div className="flex gap-3">
-              <button
-                onClick={saveProfile}
-                disabled={saving}
-                className="flex items-center gap-1 px-4 py-1 text-sm bg-blue-500 text-black rounded hover:bg-blue-400 transition disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-
-              <button
-                onClick={() => setEditing(false)}
-                className="flex items-center gap-1 px-4 py-1 text-sm border border-red-500 text-red-400 rounded hover:bg-red-900/40 transition"
-              >
-                <X className="w-4 h-4" />
-                Cancel
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* USER INFO */}
-        <div className="flex items-center gap-6 mb-10">
-          <img
-            src={form.avatarUrl || '/default-avatar.png'}
-            className="w-28 h-28 rounded-full border-2 border-blue-500 shadow shadow-blue-900/60 object-cover"
-          />
-
-          <div className="flex-1">
-            <h2 className="text-3xl font-bold text-white">{profile.username}</h2>
-
-            {/* Bio */}
-            {!editing ? (
-              <p className="text-blue-300 mt-1 text-sm">
-                {profile.bio || 'No bio added yet.'}
-              </p>
-            ) : (
-              <textarea
-                rows={2}
-                value={form.bio}
-                onChange={(e) => setForm({ ...form, bio: e.target.value })}
-                className="w-full p-2 mt-2 bg-[#0a1020] border border-blue-600 rounded text-blue-200 text-sm"
-              />
-            )}
-
-            {/* Country / Team */}
-            <div className="mt-3 text-sm space-y-2">
+      <div className="relative z-10 p-6 max-w-5xl mx-auto">
+        {/* Profile Card */}
+        <div className="backdrop-blur-md bg-slate-900/40 border border-blue-500/30 shadow-[0_8px_32px_rgba(59,130,246,0.2)] rounded-3xl overflow-hidden">
+          
+          {/* Header Banner */}
+          <div className="relative h-32 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-cyan-500/20 border-b border-blue-500/30">
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.05)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
+            
+            {/* Edit Button */}
+            <div className="absolute top-6 right-6">
               {!editing ? (
-                <>
-                  {profile.country && (
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-4 h-4 text-blue-400" />
-                      {profile.country}
-                    </div>
-                  )}
-
-                  {profile.team && (
-                    <div className="flex items-center gap-1">
-                      <Users className="w-4 h-4 text-blue-400" />
-                      {profile.team.name}
-                    </div>
-                  )}
-                </>
+                <button
+                  onClick={() => setEditing(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 backdrop-blur-sm rounded-xl transition-all duration-300 text-blue-200 font-semibold"
+                >
+                  <Edit3 className="w-4 h-4" />
+                  Edit Profile
+                </button>
               ) : (
-                <div className="flex flex-col gap-2 w-full">
-                  <input
-                    placeholder="Country"
-                    value={form.country}
-                    onChange={(e) => setForm({ ...form, country: e.target.value })}
-                    className="p-2 bg-[#0a1020] border border-blue-600 rounded text-blue-200 text-sm"
-                  />
+                <div className="flex gap-3">
+                  <button
+                    onClick={saveProfile}
+                    disabled={saving}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-500/80 hover:bg-emerald-500 backdrop-blur-sm rounded-xl transition-all duration-300 text-white font-semibold disabled:opacity-50 shadow-lg"
+                  >
+                    <Save className="w-4 h-4" />
+                    {saving ? 'Saving...' : 'Save'}
+                  </button>
 
-                  <input
-                    placeholder="Avatar URL"
-                    value={form.avatarUrl}
-                    onChange={(e) =>
-                      setForm({ ...form, avatarUrl: e.target.value })
-                    }
-                    className="p-2 bg-[#0a1020] border border-blue-600 rounded text-blue-200 text-sm"
+                  <button
+                    onClick={() => setEditing(false)}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 backdrop-blur-sm rounded-xl transition-all duration-300 text-red-300 font-semibold"
+                  >
+                    <X className="w-4 h-4" />
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="p-8 -mt-16">
+            {/* Avatar & Info Section */}
+            <div className="flex flex-col md:flex-row gap-8 mb-8">
+              {/* Avatar */}
+              <div className="relative">
+                <div className="relative w-32 h-32 rounded-2xl overflow-hidden border-4 border-slate-900 shadow-[0_8px_32px_rgba(59,130,246,0.3)]">
+                  <img
+                    src={form.avatarUrl || '/default-avatar.png'}
+                    alt={profile.username}
+                    className="w-full h-full object-cover"
                   />
+                  <div className="absolute inset-0 bg-gradient-to-t from-blue-500/20 to-transparent"></div>
+                </div>
+                <div className="absolute -bottom-2 -right-2 p-2 rounded-xl bg-gradient-to-br from-blue-500/80 to-cyan-500/80 border border-blue-400/50 shadow-lg">
+                  <Trophy className="w-5 h-5 text-white" />
+                </div>
+              </div>
+
+              {/* User Info */}
+              <div className="flex-1">
+                <div className="mb-4">
+                  <h1 className="text-4xl font-black bg-gradient-to-r from-blue-200 via-cyan-200 to-purple-200 bg-clip-text text-transparent mb-2">
+                    {profile.username}
+                  </h1>
+                  
+                  {/* Bio */}
+                  {!editing ? (
+                    <p className="text-slate-300 text-base leading-relaxed">
+                      {profile.bio || '✨ No bio added yet. Click Edit Profile to add one!'}
+                    </p>
+                  ) : (
+                    <textarea
+                      rows={3}
+                      value={form.bio}
+                      onChange={(e) => setForm({ ...form, bio: e.target.value })}
+                      placeholder="Tell us about yourself..."
+                      className="w-full p-4 bg-slate-800/50 border border-blue-500/30 rounded-xl text-slate-200 placeholder:text-slate-500 focus:border-blue-500/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    />
+                  )}
+                </div>
+
+                {/* Meta Info */}
+                <div className="flex flex-wrap gap-4">
+                  {!editing ? (
+                    <>
+                      {profile.country && (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                          <MapPin className="w-4 h-4 text-blue-400" />
+                          <span className="text-blue-200 text-sm font-medium">{profile.country}</span>
+                        </div>
+                      )}
+
+                      {profile.team && (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/30">
+                          <Users className="w-4 h-4 text-purple-400" />
+                          <span className="text-purple-200 text-sm font-medium">{profile.team.name}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-500/10 border border-slate-500/30">
+                        <Calendar className="w-4 h-4 text-slate-400" />
+                        <span className="text-slate-200 text-sm font-medium">
+                          Joined {new Date(profile.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col gap-3 w-full max-w-md">
+                      <input
+                        placeholder="🌍 Country (e.g., United States)"
+                        value={form.country}
+                        onChange={(e) => setForm({ ...form, country: e.target.value })}
+                        className="p-3 bg-slate-800/50 border border-blue-500/30 rounded-xl text-slate-200 placeholder:text-slate-500 focus:border-blue-500/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      />
+
+                      <input
+                        placeholder="🖼️ Avatar URL (https://...)"
+                        value={form.avatarUrl}
+                        onChange={(e) => setForm({ ...form, avatarUrl: e.target.value })}
+                        className="p-3 bg-slate-800/50 border border-blue-500/30 rounded-xl text-slate-200 placeholder:text-slate-500 focus:border-blue-500/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+              <ProfileStat 
+                icon={Trophy} 
+                value={profile.totalPoints} 
+                label="Total Points"
+                color="yellow"
+              />
+              <ProfileStat
+                icon={Flag}
+                value={profile.challengesSolved?.length || 0}
+                label="Challenges Solved"
+                color="green"
+              />
+              <ProfileStat
+                icon={Target}
+                value={`${Math.round((profile.challengesSolved?.length || 0) / Math.max(1, profile.totalPoints / 100) * 100)}%`}
+                label="Success Rate"
+                color="blue"
+              />
+            </div>
+
+            {/* Solved Challenges */}
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-blue-200">Solved Challenges</h2>
+                <span className="ml-auto px-3 py-1 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 text-sm font-mono">
+                  {profile.challengesSolved.length} completed
+                </span>
+              </div>
+
+              {profile.challengesSolved.length > 0 ? (
+                <div className="grid gap-3">
+                  {profile.challengesSolved.map((c, idx) => (
+                    <div
+                      key={c.id}
+                      className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-slate-800/40 via-slate-900/40 to-slate-800/40 border border-blue-500/20 p-5 backdrop-blur-sm hover:border-blue-500/40 hover:shadow-[0_4px_20px_rgba(59,130,246,0.15)] transition-all duration-300"
+                      style={{ animationDelay: `${idx * 30}ms` }}
+                    >
+                      <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-cyan-500 via-blue-500 to-purple-500 opacity-50 group-hover:opacity-100 transition-opacity"></div>
+                      
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="p-2 rounded-lg bg-blue-500/20 border border-blue-500/30">
+                            <Award className="w-5 h-5 text-blue-400" />
+                          </div>
+                          
+                          <div>
+                            <div className="text-blue-100 font-bold text-lg">{c.name}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="px-2 py-0.5 rounded-md bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-medium">
+                                {c.category}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
+                            <span className="text-emerald-300 font-black text-xl">{c.points}</span>
+                            <span className="text-emerald-400/70 text-sm ml-1">pts</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 rounded-xl bg-slate-800/30 border border-slate-700/50">
+                  <Sparkles className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                  <p className="text-slate-400 text-lg">No challenges solved yet.</p>
+                  <p className="text-slate-500 text-sm mt-2">Start your hacking journey today! 🚀</p>
                 </div>
               )}
             </div>
           </div>
         </div>
-
-        {/* STATS */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-10">
-          <ProfileStat icon={Trophy} value={profile.totalPoints} label="Total Points" />
-          <ProfileStat
-            icon={Flag}
-            value={profile.challengesSolved?.length || 0}
-            label="Solved"
-          />
-          <ProfileStat
-            icon={User}
-            value={new Date(profile.createdAt).toLocaleDateString()}
-            label="Joined"
-          />
-        </div>
-
-        {/* SOLVED CHALLENGES */}
-        <h2 className="text-xl font-bold mb-3 border-b border-blue-500/40 pb-2">
-          Solved Challenges
-        </h2>
-
-        {profile.challengesSolved.length > 0 ? (
-          <div className="space-y-3">
-            {profile.challengesSolved.map((c) => (
-              <div
-                key={c.id}
-                className="border border-blue-500/40 rounded-lg p-4 flex items-center justify-between bg-[#0a1020]/70"
-              >
-                <div>
-                  <div className="text-white font-semibold">{c.name}</div>
-                  <div className="text-xs text-blue-400">{c.category}</div>
-                </div>
-                <span className="font-bold text-blue-300">{c.points} pts</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-blue-300 text-sm">No challenges solved yet.</p>
-        )}
       </div>
     </div>
   );
@@ -268,16 +366,48 @@ function ProfileStat({
   icon: Icon,
   value,
   label,
+  color = 'blue',
 }: {
   icon: any;
   value: any;
   label: string;
+  color?: 'blue' | 'green' | 'yellow';
 }) {
+  const colorSchemes = {
+    blue: {
+      bg: 'from-blue-500/10 to-cyan-500/5',
+      border: 'border-blue-500/30',
+      icon: 'text-blue-400',
+      value: 'text-blue-100',
+      label: 'text-blue-300',
+    },
+    green: {
+      bg: 'from-emerald-500/10 to-green-500/5',
+      border: 'border-emerald-500/30',
+      icon: 'text-emerald-400',
+      value: 'text-emerald-100',
+      label: 'text-emerald-300',
+    },
+    yellow: {
+      bg: 'from-yellow-500/10 to-amber-500/5',
+      border: 'border-yellow-500/30',
+      icon: 'text-yellow-400',
+      value: 'text-yellow-100',
+      label: 'text-yellow-300',
+    },
+  };
+
+  const scheme = colorSchemes[color];
+
   return (
-    <div className="border border-blue-500/40 rounded-lg p-4 text-center bg-[#0a1020]/60 shadow shadow-blue-900/30">
-      <Icon className="w-6 h-6 mx-auto mb-2 text-blue-300" />
-      <div className="text-xl font-bold text-white">{value}</div>
-      <p className="text-xs text-blue-400">{label}</p>
+    <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${scheme.bg} border ${scheme.border} p-6 backdrop-blur-sm hover:shadow-lg transition-all duration-300 group`}>
+      <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-2xl group-hover:bg-white/10 transition-all duration-300"></div>
+      
+      <div className="relative">
+        <Icon className={`w-8 h-8 ${scheme.icon} mb-3`} />
+        <div className={`text-3xl font-black ${scheme.value} mb-1`}>{value}</div>
+        <p className={`text-sm font-medium ${scheme.label}`}>{label}</p>
+      </div>
     </div>
   );
 }

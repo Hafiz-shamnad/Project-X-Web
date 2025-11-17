@@ -1,151 +1,177 @@
-// app/projectx/page.tsx
 "use client";
+
 import { useState, useEffect } from "react";
 import { Toaster } from "react-hot-toast";
-import Tabs from "../components/Tabs";
+
 import LoadingScreen from "../components/LoadingScreen";
 import BanScreen from "../components/BanScreen";
 import ChallengeList from "../components/ChallengeList";
 import ChallengeDetails from "../components/ChallengeDetails";
-import LeaderboardPanel from "../components/LeaderboardPanel";
+
 import { useUser } from "../hooks/useUser";
 import { useBanTimer } from "../hooks/useBanTimer";
 import { useChallenges } from "../hooks/useChallenges";
+
 import type { Challenge } from "../types/Challenge";
 
 export default function ProjectXCTF() {
-  const [activeTab, setActiveTab] = useState<"challenges" | "leaderboard">(
-    "challenges"
-  );
   const [selected, setSelected] = useState<Challenge | null>(null);
 
   const { user, loading, bannedDate, isTempBanned, isPermanentBanned } =
     useUser();
   const { timerDisplay, isActive: tempTimerActive } = useBanTimer(bannedDate);
+
   const {
     challenges,
     solvedIds,
     loading: challengesLoading,
     refresh,
-  } = useChallenges({ teamId: user?.teamId ?? null });
+  } = useChallenges({
+    teamId: user?.teamId ?? null,
+  });
 
-  // Initial selection
+  // Auto-select first challenge once loaded
   useEffect(() => {
     if (!loading && !challengesLoading && !selected && challenges[0]) {
       setSelected(challenges[0]);
     }
   }, [loading, challengesLoading, challenges, selected]);
 
-  if (loading || challengesLoading) {
-    return <LoadingScreen />;
-  }
-
-  if (isTempBanned && tempTimerActive) {
+  /* -------------------- STATE HANDLING -------------------- */
+  if (loading || challengesLoading) return <LoadingScreen />;
+  if (isTempBanned && tempTimerActive)
     return <BanScreen type="temp" timer={timerDisplay} />;
-  }
-
-  if (isPermanentBanned) {
-    return <BanScreen type="perm" />;
-  }
+  if (isPermanentBanned) return <BanScreen type="perm" />;
 
   return (
-    <div className="min-h-screen bg-black text-green-400 font-mono relative overflow-hidden">
-      {/* Animated Background Effects */}
-      <div className="fixed inset-0 z-0">
-        {/* Grid Pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(34,197,94,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(34,197,94,0.03)_1px,transparent_1px)] bg-[size:50px_50px]" />
-
-        {/* Gradient Orbs */}
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-green-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
-
-        {/* Scan Lines */}
-        <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(34,197,94,0.02)_50%)] bg-[length:100%_4px] pointer-events-none" />
-      </div>
-
-      {/* Content */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 text-green-400 font-mono relative overflow-hidden">
+      {/* -------- MAIN CONTENT -------- */}
       <div className="relative z-10">
+        {/* Toasts */}
         <Toaster
           position="top-right"
           toastOptions={{
             style: {
-              background: "#1a1a1a",
+              background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
               color: "#22c55e",
-              border: "1px solid rgba(34, 197, 94, 0.3)",
+              border: "1px solid rgba(34,197,94,0.4)",
               borderRadius: "12px",
               fontFamily: "monospace",
-            },
-            success: {
-              iconTheme: {
-                primary: "#22c55e",
-                secondary: "#000",
-              },
-            },
-            error: {
-              iconTheme: {
-                primary: "#ef4444",
-                secondary: "#000",
-              },
+              boxShadow: "0 8px 32px rgba(34,197,94,0.2)",
+              backdropFilter: "blur(10px)",
             },
           }}
         />
 
-        <Tabs activeTab={activeTab} setActiveTab={setActiveTab} />
-
-        {activeTab === "challenges" ? (
-          <main className="flex flex-col md:flex-row h-[calc(100vh-80px)] overflow-hidden">
+        <main className="flex flex-col md:flex-row h-[calc(100vh-70px)]">
+          {/* LEFT PANEL — FIXED WIDTH */}
+          <div className="w-full md:w-1/3 h-full overflow-y-auto custom-scrollbar bg-slate-900/40 border-r border-green-500/30">
             <ChallengeList
               challenges={challenges}
               selected={selected}
               solvedIds={solvedIds}
-              onSelect={(c) => setSelected(c)}
+              onSelect={setSelected}
             />
-
-            <ChallengeDetails
-              selected={selected}
-              solvedIds={solvedIds}
-              username={user?.username ?? ""}
-              refreshChallenges={refresh}
-            />
-          </main>
-        ) : (
-          <div className="h-[calc(100vh-80px)] overflow-hidden">
-            <LeaderboardPanel />
           </div>
-        )}
+
+          {/* RIGHT PANEL — FIXED WIDTH */}
+          <div className="w-full md:w-2/3 h-full overflow-y-auto custom-scrollbar bg-slate-900/30">
+            {selected ? (
+              <div className="animate-[fadeIn_0.3s_ease-out]">
+                <ChallengeDetails
+                  selected={selected}
+                  solvedIds={solvedIds}
+                  username={user?.username ?? ""}
+                  refreshChallenges={refresh}
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-4 p-8">
+                  <div className="text-6xl mb-4 animate-pulse">🎯</div>
+                  <p className="text-green-500/60 text-lg">
+                    Select a challenge to begin
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
       </div>
 
+      {/* ---------- ANIMATIONS + SCROLLBAR ---------- */}
       <style jsx>{`
-        @keyframes pulse-slow {
+        @keyframes float {
           0%,
           100% {
-            opacity: 0.3;
+            transform: translate(0, 0) scale(1);
           }
-          50% {
-            opacity: 0.6;
+          33% {
+            transform: translate(30px, -30px) scale(1.1);
+          }
+          66% {
+            transform: translate(-20px, 20px) scale(0.9);
           }
         }
 
-        .delay-1000 {
-          animation-delay: 1s;
+        @keyframes grid {
+          0% {
+            transform: translateY(0);
+          }
+          100% {
+            transform: translateY(40px);
+          }
         }
 
-        /* Custom Scrollbar */
-        :global(.no-scrollbar::-webkit-scrollbar) {
-          width: 8px;
+        @keyframes scan {
+          0% {
+            transform: translateY(-100%);
+          }
+          100% {
+            transform: translateY(100%);
+          }
         }
 
-        :global(.no-scrollbar::-webkit-scrollbar-track) {
-          background: rgba(0, 0, 0, 0.3);
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
-        :global(.no-scrollbar::-webkit-scrollbar-thumb) {
-          background: rgba(34, 197, 94, 0.3);
-          border-radius: 4px;
+        /* Scrollbar */
+        :global(.custom-scrollbar::-webkit-scrollbar) {
+          width: 10px;
+        }
+        :global(.custom-scrollbar::-webkit-scrollbar-track) {
+          background: rgba(15, 23, 42, 0.5);
+          border-left: 1px solid rgba(34, 197, 94, 0.1);
+        }
+        :global(.custom-scrollbar::-webkit-scrollbar-thumb) {
+          background: linear-gradient(
+            180deg,
+            rgba(34, 197, 94, 0.4),
+            rgba(34, 197, 94, 0.6)
+          );
+          border-radius: 5px;
+          border: 2px solid rgba(15, 23, 42, 0.5);
+          box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+        }
+        :global(.custom-scrollbar::-webkit-scrollbar-thumb:hover) {
+          background: linear-gradient(
+            180deg,
+            rgba(34, 197, 94, 0.6),
+            rgba(34, 197, 94, 0.8)
+          );
+          box-shadow: 0 0 15px rgba(34, 197, 94, 0.5);
         }
 
-        :global(.no-scrollbar::-webkit-scrollbar-thumb:hover) {
-          background: rgba(34, 197, 94, 0.5);
+        :global(.custom-scrollbar) {
+          scroll-behavior: smooth;
         }
       `}</style>
     </div>

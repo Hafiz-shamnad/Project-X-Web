@@ -135,36 +135,83 @@ exports.getMyTeam = async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    // Get user -> team
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        team: {
-          include: { members: true },
-        },
-      },
+      select: { teamId: true },
     });
 
-    if (!user?.team) {
+    if (!user?.teamId) {
       return res.status(404).json({ error: "User does not belong to a team" });
     }
 
-    const teamId = user.team.id;
+    const teamId = user.teamId;
 
-    const teamScore = await prisma.solved.aggregate({
-      where: { teamId },
-      _sum: { points: true },
+    // Fetch team with full member solve history
+    const team = await prisma.team.findUnique({
+      where: { id: teamId },
+      include: {
+        members: {
+          include: {
+            solved: {
+              include: {
+                challenge: {
+                  select: {
+                    id: true,
+                    name: true,
+                    points: true,
+                    category: true,
+                    difficulty: true,
+                  },
+                },
+              },
+              orderBy: { createdAt: "asc" },
+            },
+          },
+        },
+        solved: true,
+      },
+    });
+
+    if (!team) {
+      return res.status(404).json({ error: "Team not found" });
+    }
+
+    // Total team points
+    const totalPoints = team.solved.reduce(
+      (sum, s) => sum + s.points,
+      0
+    );
+
+    // Member-level data mapping
+    const members = team.members.map((m) => {
+      const memberPoints = m.solved.reduce((sum, s) => sum + s.points, 0);
+
+      const solves = m.solved.map((s) => ({
+        challengeId: s.challenge.id,
+        challengeName: s.challenge.name,
+        points: s.points,
+        solvedAt: s.solvedAt,
+        category: s.challenge.category,
+        difficulty: s.challenge.difficulty,
+      }));
+
+      return {
+        id: m.id,
+        username: m.username,
+        points: memberPoints,
+        solves,
+        solveCount: solves.length,
+      };
     });
 
     return res.json({
       team: {
-        id: user.team.id,
-        name: user.team.name,
-        joinCode: user.team.joinCode,
-        totalPoints: teamScore._sum.points || 0,
-        members: user.team.members.map((m) => ({
-          id: m.id,
-          username: m.username,
-        })),
+        id: team.id,
+        name: team.name,
+        joinCode: team.joinCode,
+        totalPoints,
+        members,
       },
     });
   } catch (err) {
@@ -172,6 +219,7 @@ exports.getMyTeam = async (req, res) => {
     return res.status(500).json({ error: "Server error fetching team" });
   }
 };
+
 
 /* -------------------------------------------------------------------------- */
 /*                                 Team Solves                                 */
