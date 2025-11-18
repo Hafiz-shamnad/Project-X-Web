@@ -1,8 +1,12 @@
-const express = require("express");
-const { authenticate } = require("../middlewares/auth");
+/**
+ * Challenge Routes (ESM)
+ * ----------------------
+ */
 
+import express from "express";
+import { authenticate } from "../middlewares/auth.js";
 
-const {
+import {
   getChallengeById,
   getChallenges,
   getPublicChallenges,
@@ -10,34 +14,37 @@ const {
   stopChallenge,
   getChallengeInstance,
   spawnChallengeInstance,
-  extendInstance
-} = require("../controllers/challengeController");
+  extendInstance,
+} from "../controllers/challengeController.js";
 
 const router = express.Router();
 
-/* ------------------- Instance Routes (protected) ------------------- */
-// User must be logged in to view their container instance
+/**
+ * Instance Routes (protected)
+ */
 router.get("/instance/:id", authenticate, getChallengeInstance);
-
-// User must be logged in to spawn a container
 router.post("/spawn/:id", authenticate, spawnChallengeInstance);
 
-/* ----------------------------- Public Routes ---------------------------- */
-// Public info – no login required
+/**
+ * Public challenge list
+ */
 router.get("/public", getPublicChallenges);
 
-// Might be public or admin depending on your app; currently public
+/**
+ * Get all challenges
+ */
 router.get("/", getChallenges);
 
-/* ------------------------- Challenge Metadata --------------------------- */
-// Challenge details (if private challenges shouldn't be visible, move behind auth)
+/**
+ * Get challenge metadata
+ */
 router.get("/:id", getChallengeById);
 
-/* ------------------------- Container Lifecycle -------------------------- */
-// Starting/stopping a container requires login
+/**
+ * Container lifecycle (protected)
+ */
 router.post("/start/:id", authenticate, startChallenge);
 router.post("/stop/:id", authenticate, stopChallenge);
 router.post("/extend/:id", authenticate, extendInstance);
 
-
-module.exports = router;
+export default router;

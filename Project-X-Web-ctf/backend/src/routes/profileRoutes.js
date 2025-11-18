@@ -1,47 +1,32 @@
 /**
- * Profile Routes
- * --------------
- * Handles:
- *  - Authenticated user profile retrieval
- *  - Profile updates
- *  - Public profile lookup by username
+ * Profile Routes (ESM)
+ * --------------------
  */
 
-const express = require("express");
-const { authenticate } = require("../middlewares/auth");
+import express from "express";
+import { authenticate } from "../middlewares/auth.js";
 
-const {
+import {
   getMyProfile,
   getPublicProfile,
   updateMyProfile,
-} = require("../controllers/profileController");
+} from "../controllers/profileController.js";
 
 const router = express.Router();
 
-/* -------------------------------------------------------------------------- */
-/*                               Authenticated Routes                           */
-/* -------------------------------------------------------------------------- */
-
 /**
- * Get the authenticated user's profile
- * GET /api/profile/me
+ * Authenticated profile
  */
 router.get("/me", authenticate, getMyProfile);
 
 /**
- * Update authenticated user's profile
- * PUT /api/profile/me
+ * Update profile
  */
 router.put("/me", authenticate, updateMyProfile);
 
-/* -------------------------------------------------------------------------- */
-/*                                  Public Routes                               */
-/* -------------------------------------------------------------------------- */
-
 /**
- * Get a public profile by username
- * GET /api/profile/:username
+ * Public profile
  */
 router.get("/:username", getPublicProfile);
 
-module.exports = router;
+export default router;

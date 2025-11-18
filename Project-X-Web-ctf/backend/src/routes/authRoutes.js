@@ -1,49 +1,24 @@
 /**
- * Authentication Routes
- * ----------------------
- * Handles:
- *  - User registration
- *  - Login
- *  - Logout
- *  - Session check (/me)
+ * Authentication Routes (ESM)
+ * ---------------------------
  */
 
-const express = require("express");
-const { register, login, logout, me } = require("../controllers/authController");
-const { authenticate } = require("../middlewares/auth");
+import express from "express";
+import { register, login, logout, me } from "../controllers/authController.js";
+import { authenticate } from "../middlewares/auth.js";
 
 const router = express.Router();
 
-/* -------------------------------------------------------------------------- */
-/*                                 Public Routes                               */
-/* -------------------------------------------------------------------------- */
-
 /**
- * Register a new user
- * POST /api/auth/register
+ * Public
  */
 router.post("/register", register);
-
-/**
- * Authenticate a user and issue a session token
- * POST /api/auth/login
- */
 router.post("/login", login);
-
-/**
- * Clear authentication cookie
- * POST /api/auth/logout
- */
 router.post("/logout", logout);
 
-/* -------------------------------------------------------------------------- */
-/*                               Protected Routes                              */
-/* -------------------------------------------------------------------------- */
-
 /**
- * Get authenticated user's session data
- * GET /api/auth/me
+ * Protected session info
  */
 router.get("/me", authenticate, me);
 
-module.exports = router;
+export default router;

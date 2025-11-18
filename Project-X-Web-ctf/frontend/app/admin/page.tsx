@@ -8,6 +8,7 @@ import ChallengeCreate from "./components/ChallengeCreate";
 import ChallengeManage from "./components/ChallengeManage";
 import TeamManager from "./components/TeamManager";
 import LeaderboardPanel from "./components/LeaderboardPanel";
+import AnnouncementCreate from "./components/AnnouncementCreate";
 
 import ConfirmModal from "../components/ConfirmModal";
 import InputModal from "../components/InputModal";
@@ -21,7 +22,7 @@ import { useAdminModals } from "./hooks/useAdminModals";
 ------------------------------------------- */
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<
-    "create" | "manage" | "leaderboard" | "teams"
+    "create" | "manage" | "leaderboard" | "teams" | "announcement"
   >("create");
 
   /* ---------- Toasts ---------- */
@@ -96,6 +97,21 @@ export default function AdminPanel() {
   );
 
   /* ---------- Memoized Pages ---------- */
+
+  const AnnouncementPage = useMemo(
+    () => (
+      <AnnouncementCreate
+        onSuccess={(ann) => {
+          if (ann?.title) showSuccess(`Announcement created: ${ann.title}`);
+          else showSuccess("Announcement created.");
+        }}
+        onError={(err) => {
+          showError(err || "Failed to create announcement.");
+        }}
+      />
+    ),
+    [showSuccess, showError]
+  );
 
   const CreatePage = useMemo(
     () => (
@@ -273,6 +289,7 @@ export default function AdminPanel() {
         {activeTab === "manage" && ManagePage}
         {activeTab === "leaderboard" && LeaderboardPage}
         {activeTab === "teams" && TeamsPage}
+        {activeTab === "announcement" && <>{AnnouncementPage}</>}
       </main>
 
       {/* Modals */}

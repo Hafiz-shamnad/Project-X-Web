@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "name": "backend",
   "version": "1.0.0",
   "description": "",
@@ -15,6 +16,7 @@
     "@prisma/client": "^6.19.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
+    "chalk": "^5.6.2",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -24,13 +26,15 @@
     "express-rate-limit": "^8.2.1",
     "express-validator": "^7.3.0",
     "helmet": "^8.1.0",
+    "inquirer": "^13.0.1",
     "jsonwebtoken": "^9.0.2",
     "lowdb": "^7.0.1",
     "mongoose": "^8.19.3",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
     "nanoid": "^5.1.6",
-    "prisma": "^6.19.0"
+    "prisma": "^6.19.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

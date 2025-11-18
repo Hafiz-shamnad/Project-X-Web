@@ -18,9 +18,11 @@ export const BACKEND_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
 interface Solve {
-  challenge: { points: number };
+  challengeId: number;
+  points: number;
   createdAt: string;
 }
+
 
 interface TeamData {
   id: number;
@@ -73,53 +75,60 @@ export default function AdminLeaderboard() {
   }, [fetchLeaderboard]);
 
   /* ---------------- TIMELINE PREP (fixed) ---------------- */
-  const timelineData = useMemo(() => {
-    if (!leaderboard.length) return {};
+const timelineData = useMemo(() => {
+  if (!leaderboard.length) return {};
 
-    const top = leaderboard.slice(0, 10);
-    const result: Record<string, TimelinePoint[]> = {};
+  const result: Record<string, TimelinePoint[]> = {};
 
-    for (const member of top) {
-      const label = member.teamName || "Unknown";
+  const top = leaderboard.slice(0, 10);
 
-      const sorted = [...(member.solves ?? [])].sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      );
+  for (const team of top) {
+    const label = team.teamName ?? "Unknown";
+    const solves = team.solves ?? [];
 
-      let cumulative = 0;
-      const points: TimelinePoint[] = [];
-
-      for (const s of sorted) {
-        cumulative += s.challenge?.points ?? 0;
-        points.push({
-          time: new Date(s.createdAt).getTime(),
-          score: cumulative,
-          label,
-        });
-      }
-
-      if (points.length) {
-        // start from 0 slightly before first solve
-        points.unshift({
-          time: points[0].time - 60000,
-          score: 0,
-          label,
-        });
-      } else {
-        // no solves yet: just one point at current score
-        points.push({
+    if (solves.length === 0) {
+      result[label] = [
+        {
           time: Date.now(),
-          score: member.score,
+          score: team.score,
           label,
-        });
-      }
-
-      result[label] = points;
+        },
+      ];
+      continue;
     }
 
-    return result;
-  }, [leaderboard]);
+    // Sort once
+    const sorted = solves
+      .map((s) => ({
+        time: new Date(s.createdAt).getTime(),
+        points: s.points ?? 0,
+      }))
+      .sort((a, b) => a.time - b.time);
+
+    let cumulative = 0;
+
+    const points: TimelinePoint[] = sorted.map((s) => {
+      cumulative += s.points;
+      return {
+        time: s.time,
+        score: cumulative,
+        label,
+      };
+    });
+
+    // Start with a zero point for smooth graph start
+    points.unshift({
+      time: points[0].time - 60000,
+      score: 0,
+      label,
+    });
+
+    result[label] = points;
+  }
+
+  return result;
+}, [leaderboard]);
+
 
   /* ---------------- COLORS ---------------- */
   const teamColors = [
@@ -234,7 +243,9 @@ export default function AdminLeaderboard() {
             className="px-8 py-6 flex justify-between items-center border-b border-blue-500/10 hover:bg-blue-500/10 transition"
           >
             <div className="flex items-center gap-4">
-              <span className="text-blue-400 font-bold text-xl">#{idx + 4}</span>
+              <span className="text-blue-400 font-bold text-xl">
+                #{idx + 4}
+              </span>
               <div>
                 <div className="text-slate-200 font-semibold">{t.teamName}</div>
                 <div className="text-slate-500 text-sm">{t.solved} solved</div>

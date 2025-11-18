@@ -1,51 +1,38 @@
 /**
- * Team Routes
- * -----------
- * Handles:
- *  - Fetching authenticated user's team
- *  - Creating a team
- *  - Joining a team
- *  - Fetching a team's solve history
+ * Team Routes (ESM)
+ * -----------------
  */
 
-const express = require("express");
-const { authenticate } = require("../middlewares/auth");
+import express from "express";
+import { authenticate } from "../middlewares/auth.js";
 
-const {
+import {
   getMyTeam,
   createTeam,
   joinTeam,
   getTeamSolves,
-} = require("../controllers/teamController");
+} from "../controllers/teamController.js";
 
 const router = express.Router();
 
-/* -------------------------------------------------------------------------- */
-/*                             Authenticated Routes                             */
-/* -------------------------------------------------------------------------- */
-
 /**
- * Get the authenticated user's team
- * GET /api/team/me
+ * Authenticated user's team
  */
 router.get("/me", authenticate, getMyTeam);
 
 /**
- * Create a new team
- * POST /api/team/create
+ * Create team
  */
 router.post("/create", authenticate, createTeam);
 
 /**
- * Join an existing team via join code
- * POST /api/team/join
+ * Join team
  */
 router.post("/join", authenticate, joinTeam);
 
 /**
- * Get all solves made by members of a specific team
- * GET /api/team/:id/solves
+ * Team solves history
  */
 router.get("/:id/solves", authenticate, getTeamSolves);
 
-module.exports = router;
+export default router;

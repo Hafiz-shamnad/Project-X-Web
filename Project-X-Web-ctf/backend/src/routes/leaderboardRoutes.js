@@ -1,40 +1,30 @@
 /**
- * Leaderboard Routes
- * -------------------
- * Handles:
- *  - Global user leaderboard
- *  - Global team leaderboard
- *  - Team-specific member leaderboard
+ * Leaderboard Routes (ESM)
+ * ------------------------
  */
 
-const express = require("express");
-const router = express.Router();
-const {
+import express from "express";
+import {
   getLeaderboard,
   getTeamLeaderboard,
   getTeamMembersLeaderboard,
-} = require("../controllers/leaderboardController");
+} from "../controllers/leaderboardController.js";
 
-/* -------------------------------------------------------------------------- */
-/*                                   Routes                                    */
-/* -------------------------------------------------------------------------- */
+const router = express.Router();
 
 /**
- * Global user leaderboard
- * GET /api/leaderboard
+ * Global leaderboard
  */
 router.get("/", getLeaderboard);
 
 /**
- * Global team leaderboard
- * GET /api/leaderboard/teams
+ * Team leaderboard
  */
 router.get("/teams", getTeamLeaderboard);
 
 /**
- * Team-specific internal leaderboard
- * GET /api/leaderboard/team/:id
+ * Internal team leaderboard
  */
 router.get("/team/:id", getTeamMembersLeaderboard);
 
-module.exports = router;
+export default router;
