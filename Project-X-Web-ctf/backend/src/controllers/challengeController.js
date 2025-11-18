@@ -1,56 +1,24 @@
 /**
- * Challenge Query Controller
- * --------------------------
- * This controller governs all read and lifecycle operations related to CTF
- * challenges. It acts as the boundary between routes and the service/database
- * layers, ensuring:
- *
- *  - Input validation and error normalization.
- *  - Authorization enforcement (where applicable).
- *  - Structured API responses for client applications.
- *
- * Responsibilities:
- *  - Fetching challenge metadata (public or admin-level).
- *  - Fetching a single challenge by ID, including file URLs.
- *  - Orchestrating the lifecycle of Docker-based challenge instances.
+ * Challenge Controller (ESM + Optimized)
  */
 
-const { prisma } = require("../config/db");
-const {
+import prisma from "../config/db.js";
+import {
   startChallengeContainer,
   stopChallengeContainer,
   extendChallengeContainer
-} = require("../services/containerService");
+} from "../services/containerService.js";
 
 /* -------------------------------------------------------------------------- */
-/*                           Get Challenge by ID                               */
+/*                               Get Challenge                                 */
 /* -------------------------------------------------------------------------- */
 
-/**
- * GET /api/challenges/:id
- * ------------------------
- * Retrieves metadata for a single challenge, including optional file URLs.
- *
- * Behaviors:
- *  - Validates that the ID parameter is numeric.
- *  - Returns only selected fields to prevent accidental leakage of admin-only data.
- *  - If the challenge includes a downloadable file, a fully qualified URL is
- *    constructed based on the current hostname and protocol.
- *
- * Error Handling:
- *  - Invalid ID → 400
- *  - Not found → 404
- *  - Unexpected errors → 500
- */
-exports.getChallengeById = async (req, res) => {
+export async function getChallengeById(req, res) {
   try {
     const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
 
-    if (isNaN(id)) {
-      return res.status(400).json({ error: "Invalid challenge ID" });
-    }
-
-    const challenge = await prisma.challenge.findUnique({
+    const ch = await prisma.challenge.findUnique({
       where: { id },
       select: {
         id: true,
@@ -59,73 +27,43 @@ exports.getChallengeById = async (req, res) => {
         category: true,
         difficulty: true,
         points: true,
-        filePath: true,
-      },
+        filePath: true
+      }
     });
 
-    if (!challenge) {
-      return res.status(404).json({ error: "Challenge not found" });
-    }
+    if (!ch) return res.status(404).json({ error: "Challenge not found" });
 
-    // Build fully qualified file URL if file exists
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
-    const fileUrl = challenge.filePath
-      ? `${baseUrl}/${challenge.filePath}`
-      : null;
+    const base = `${req.protocol}://${req.get("host")}`;
 
     return res.json({
-      ...challenge,
-      fileUrl,
+      ...ch,
+      fileUrl: ch.filePath ? `${base}/${ch.filePath}` : null
     });
   } catch (err) {
-    console.error("Error fetching challenge by ID:", err);
+    console.error("getChallenge error:", err);
     return res.status(500).json({ error: "Server error" });
   }
-};
+}
 
 /* -------------------------------------------------------------------------- */
-/*                            Get All Challenges                               */
+/*                             Get Challenges                                  */
 /* -------------------------------------------------------------------------- */
 
-/**
- * GET /api/challenges
- * -------------------
- * Retrieves all challenges. Intended primarily for administrative dashboards or
- * internal systems that require visibility into all challenge definitions.
- *
- * Notes:
- *  - No filters applied here; authentication/authorization should be enforced
- *    via middleware or controller logic depending on platform design.
- *  - Ordered newest-first for consistency with leaderboard and analytics flows.
- */
-exports.getChallenges = async (req, res) => {
+export async function getChallenges(req, res) {
   try {
     const challenges = await prisma.challenge.findMany({
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "desc" }
     });
 
     return res.json(challenges);
   } catch (err) {
-    console.error("Error fetching challenges:", err);
+    console.error("getChallenges error:", err);
     return res.status(500).json({ error: "Server error" });
   }
-};
+}
 
-/* -------------------------------------------------------------------------- */
-/*                         Get Public Released Challenges                      */
-/* -------------------------------------------------------------------------- */
-
-/**
- * GET /api/challenges/public
- * ---------------------------
- * Retrieves challenges that are marked as released and therefore visible to
- * players. This endpoint powers the challenge listing page on the user side.
- *
- * Notes:
- *  - Only a subset of fields is returned to avoid disclosing internal metadata.
- *  - `released: true` ensures controlled rollout of challenges.
- */
-exports.getPublicChallenges = async (req, res) => {
+/* Public released challenges */
+export async function getPublicChallenges(req, res) {
   try {
     const challenges = await prisma.challenge.findMany({
       where: { released: true },
@@ -137,132 +75,128 @@ exports.getPublicChallenges = async (req, res) => {
         difficulty: true,
         points: true,
         filePath: true,
-        createdAt: true,
+        createdAt: true
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "desc" }
     });
 
     return res.json(challenges);
   } catch (err) {
-    console.error("Error fetching public challenges:", err);
-    return res.status(500).json({
-      error: "Failed to fetch public challenges",
-    });
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch public challenges" });
   }
-};
+}
 
 /* -------------------------------------------------------------------------- */
-/*                     Docker-Based Challenge Lifecycle                        */
+/*                   Docker Challenge Instance Management                     */
 /* -------------------------------------------------------------------------- */
-/* START CONTAINER */
-exports.startChallenge = async (req, res) => {
-  const userId = req.user?.id;
-  const challengeId = Number(req.params.id);
 
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
-
+export async function startChallenge(req, res) {
   try {
+    const userId = req.user?.id;
+    const challengeId = Number(req.params.id);
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
     const result = await startChallengeContainer(userId, challengeId);
-    res.json(result);
+    return res.json(result);
   } catch (err) {
-    console.error("Start error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("startChallenge error:", err);
+    return res.status(500).json({ error: err.message });
   }
-};
+}
 
-/* STOP CONTAINER */
-exports.stopChallenge = async (req, res) => {
-  const userId = req.user?.id;
-  const challengeId = Number(req.params.id);
-
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
-
+export async function stopChallenge(req, res) {
   try {
+    const userId = req.user?.id;
+    const challengeId = Number(req.params.id);
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
     const result = await stopChallengeContainer(userId, challengeId);
-    res.json(result);
+    return res.json(result);
   } catch (err) {
-    console.error("Stop error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("stopChallenge error:", err);
+    return res.status(500).json({ error: err.message });
   }
-};
+}
 
-/* GET INSTANCE */
-exports.getChallengeInstance = async (req, res) => {
-  const userId = req.user?.id;
-  const challengeId = Number(req.params.id);
-
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
-
+export async function getChallengeInstance(req, res) {
   try {
-    const challenge = await prisma.challenge.findUnique({
+    const userId = req.user?.id;
+    const challengeId = Number(req.params.id);
+
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const ch = await prisma.challenge.findUnique({
       where: { id: challengeId },
-      select: { hasContainer: true },
+      select: { hasContainer: true }
     });
 
-    if (!challenge) return res.status(404).json({ error: "Not found" });
-    if (!challenge.hasContainer) return res.json({ status: "no-container" });
+    if (!ch) return res.status(404).json({ error: "Not found" });
+    if (!ch.hasContainer) return res.json({ status: "no-container" });
 
-    const instance = await prisma.userContainer.findFirst({
-      where: { userId, challengeId },
+    const inst = await prisma.userContainer.findFirst({
+      where: { userId, challengeId }
     });
 
-    if (!instance) return res.json({ status: "none" });
+    if (!inst) return res.json({ status: "none" });
 
-    res.json({
+    return res.json({
       status: "running",
-      port: instance.port,
-      url: `http://localhost:${instance.port}`,
-      expiresAt: instance.expiresAt,
+      port: inst.port,
+      url: `http://localhost:${inst.port}`,
+      expiresAt: inst.expiresAt
     });
   } catch (err) {
-    console.error("Get instance error:", err);
-    res.status(500).json({ error: "Server error" });
+    console.error("getInstance error:", err);
+    return res.status(500).json({ error: "Server error" });
   }
-};
+}
 
-/* SPAWN OR RETURN INSTANCE */
-exports.spawnChallengeInstance = async (req, res) => {
-  const userId = req.user?.id;
-  const challengeId = Number(req.params.id);
-
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
-
+export async function spawnChallengeInstance(req, res) {
   try {
-    const challenge = await prisma.challenge.findUnique({
-      where: { id: challengeId },
-      select: { hasContainer: true },
-    });
-
-    if (!challenge) return res.status(404).json({ error: "Not found" });
-    if (!challenge.hasContainer) return res.json({ status: "no-container" });
+    const userId = req.user?.id;
+    const challengeId = Number(req.params.id);
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const result = await startChallengeContainer(userId, challengeId);
 
-    res.json({
+    return res.json({
       status: result.status,
       port: result.port,
       url: `http://localhost:${result.port}`,
-      expiresAt: result.expiresAt,
+      expiresAt: result.expiresAt
     });
   } catch (err) {
-    console.error("Spawn error:", err);
-    res.status(500).json({ error: "Server error" });
+    console.error("spawn error:", err);
+    return res.status(500).json({ error: "Server error" });
   }
-};
+}
 
-
-exports.extendInstance = async (req, res) => {
+export async function extendInstance(req, res) {
   try {
-    const userId = req.user.id;
-    const challengeId = Number(req.params.id);
-
-    const result = await extendChallengeContainer(userId, challengeId);
+    const result = await extendChallengeContainer(
+      req.user.id,
+      Number(req.params.id)
+    );
 
     if (result.error) return res.status(400).json(result);
-
     return res.json(result);
   } catch (err) {
-    console.error("Extend error:", err);
-    return res.status(500).json({ error: "Failed to extend instance" });
+    console.error("extend error:", err);
+    return res
+      .status(500)
+      .json({ error: "Failed to extend challenge instance" });
   }
+}
+
+export default {
+  getChallengeById,
+  getChallenges,
+  getPublicChallenges,
+  startChallenge,
+  stopChallenge,
+  getChallengeInstance,
+  spawnChallengeInstance,
+  extendInstance
 };

@@ -1,10 +1,10 @@
 /**
- * Flag Hashing Utility
- * --------------------
+ * Flag Hashing Utility (ESM)
+ * --------------------------
  * Creates a SHA-256 hash of a flag combined with an optional salt.
  */
 
-const crypto = require("crypto");
+import crypto from "crypto";
 
 const FLAG_SALT = process.env.FLAG_SALT || "";
 
@@ -13,7 +13,7 @@ const FLAG_SALT = process.env.FLAG_SALT || "";
  * @param {string} flag
  * @returns {string} hex hash
  */
-function hashFlag(flag) {
+export function hashFlag(flag) {
   if (typeof flag !== "string") {
     throw new Error("Invalid flag: expected a string");
   }
@@ -24,4 +24,4 @@ function hashFlag(flag) {
     .digest("hex");
 }
 
-module.exports = hashFlag;
+export default hashFlag;

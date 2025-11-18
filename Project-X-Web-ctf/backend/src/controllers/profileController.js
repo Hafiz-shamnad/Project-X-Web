@@ -1,29 +1,17 @@
 /**
- * Profile Controller
- * ------------------
- * Handles:
- *  - Fetching authenticated user's profile
- *  - Fetching public user profiles
- *  - Updating authenticated user's profile
+ * Profile Controller (ESM + Optimized)
  */
 
-const { prisma } = require("../config/db");
+import prisma from "../config/db.js";
 
 /* -------------------------------------------------------------------------- */
-/*                        GET AUTHENTICATED USER PROFILE                       */
+/*                           GET AUTHENTICATED PROFILE                         */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Return the profile of the authenticated user.
- * @route GET /api/profile/me
- */
-exports.getMyProfile = async (req, res) => {
+export async function getMyProfile(req, res) {
   try {
     const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -36,9 +24,7 @@ exports.getMyProfile = async (req, res) => {
       },
     });
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     const totalPoints = user.solved.reduce(
       (sum, s) => sum + (s.challenge?.points || 0),
@@ -50,6 +36,8 @@ exports.getMyProfile = async (req, res) => {
       username: user.username,
       bio: user.bio,
       country: user.country,
+      avatarUrl: user.avatarUrl,
+      createdAt: user.createdAt,
       team: user.team ? { id: user.team.id, name: user.team.name } : null,
       totalPoints,
       challengesSolved: user.solved.map((s) => ({
@@ -58,30 +46,21 @@ exports.getMyProfile = async (req, res) => {
         category: s.challenge.category,
         points: s.challenge.points,
       })),
-      createdAt: user.createdAt,
-      avatarUrl: user.avatarUrl,
     });
   } catch (err) {
-    console.error("Profile fetch error:", err);
+    console.error("getMyProfile error:", err);
     return res.status(500).json({ error: "Server error" });
   }
-};
+}
 
 /* -------------------------------------------------------------------------- */
-/*                           GET PUBLIC USER PROFILE                           */
+/*                           GET PUBLIC PROFILE                                */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Return a public profile for a given username.
- * @route GET /api/profile/:username
- */
-exports.getPublicProfile = async (req, res) => {
+export async function getPublicProfile(req, res) {
   try {
     const { username } = req.params;
-
-    if (!username) {
-      return res.status(400).json({ error: "Invalid username" });
-    }
+    if (!username) return res.status(400).json({ error: "Invalid username" });
 
     const user = await prisma.user.findUnique({
       where: { username },
@@ -91,12 +70,10 @@ exports.getPublicProfile = async (req, res) => {
       },
     });
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     const totalPoints = user.solves.reduce(
-      (sum, s) => sum + (s.challenge?.points || 0),
+      (a, b) => a + (b.challenge?.points || 0),
       0
     );
 
@@ -104,36 +81,29 @@ exports.getPublicProfile = async (req, res) => {
       username: user.username,
       bio: user.bio,
       country: user.country,
-      team: user.team ? user.team.name : null,
-      totalPoints,
-      solveCount: user.solves.length,
       avatarUrl: user.avatarUrl,
+      team: user.team ? user.team.name : null,
+      solveCount: user.solves.length,
+      totalPoints,
     });
   } catch (err) {
-    console.error("Public profile error:", err);
+    console.error("getPublicProfile error:", err);
     return res.status(500).json({ error: "Server error" });
   }
-};
+}
 
 /* -------------------------------------------------------------------------- */
-/*                        UPDATE AUTHENTICATED USER PROFILE                    */
+/*                         UPDATE AUTHENTICATED PROFILE                        */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Update the profile of the authenticated user.
- * @route PUT /api/profile/me
- */
-exports.updateMyProfile = async (req, res) => {
+export async function updateMyProfile(req, res) {
   try {
     const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const { bio, country, avatarUrl } = req.body;
 
-    const updatedUser = await prisma.user.update({
+    const user = await prisma.user.update({
       where: { id: userId },
       data: {
         bio: bio ?? "",
@@ -152,10 +122,16 @@ exports.updateMyProfile = async (req, res) => {
 
     return res.json({
       message: "Profile updated successfully",
-      user: updatedUser,
+      user,
     });
   } catch (err) {
-    console.error("Profile update error:", err);
+    console.error("updateMyProfile error:", err);
     return res.status(500).json({ error: "Server error updating profile" });
   }
+}
+
+export default {
+  getMyProfile,
+  getPublicProfile,
+  updateMyProfile,
 };

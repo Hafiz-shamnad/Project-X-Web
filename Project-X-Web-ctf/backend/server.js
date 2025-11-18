@@ -1,61 +1,80 @@
 /**
- * Project_X - Production Server
- * Secure, Strict, Scalable Express Setup
+ * Project_X - Production Server (ESM Version)
+ * Secure, Strict & Scalable Express + WebSocket Setup
  */
 
-require("dotenv").config();
+import "dotenv/config";
+import express from "express";
+import helmet from "helmet";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import rateLimit from "express-rate-limit";
+import morgan from "morgan";
+import path from "path";
+import fs from "fs";
+import compression from "compression";
+import http from "http";
 
-const express = require("express");
-const helmet = require("helmet");
-const cors = require("cors");
-const cookieParser = require("cookie-parser");
-const rateLimit = require("express-rate-limit");
-const morgan = require("morgan");
-const path = require("path");
-const fs = require("fs");
-const compression = require("compression");
+import { fileURLToPath } from "url";
 
-const { initDB } = require("./src/config/db");
-const { autoStopExpiredContainers } = require("./src/jobs/autostopper");
+// DB + Jobs
+import { initDB } from "./src/config/db.js";
+import { autoStopExpiredContainers } from "./src/jobs/autostopper.js";
 
-/* -------------------------------------------------------------------------- */
-/*                               Initialize App                                */
-/* -------------------------------------------------------------------------- */
+// WebSocket
+import { initWebSocketServer } from "./src/lib/ws/ws.js";
+
+// Routes
+import challengeRoutes from "./src/routes/challengeRoutes.js";
+import leaderboardRoutes from "./src/routes/leaderboardRoutes.js";
+import userRoutes from "./src/routes/userRoutes.js";
+import flagRoutes from "./src/routes/flagRoutes.js";
+import authRoutes from "./src/routes/authRoutes.js";
+import adminRoutes from "./src/routes/adminRoutes.js";
+import teamRoutes from "./src/routes/teamRoutes.js";
+import profileRoutes from "./src/routes/profileRoutes.js";
+import announcementRoutes from "./src/routes/announcementRoutes.js";
+
+// --------------------------------------------------------------------------
+// Init
+// --------------------------------------------------------------------------
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-/* -------------------------------------------------------------------------- */
-/*                               Security Setup                                */
-/* -------------------------------------------------------------------------- */
+// Handle __dirname in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Security headers
+// WebSocket
+const server = http.createServer(app);
+initWebSocketServer(server);
+
+// --------------------------------------------------------------------------
+// Security
+// --------------------------------------------------------------------------
+
 app.use(
   helmet({
-    contentSecurityPolicy: false, // Disable if frontend loads external scripts
+    contentSecurityPolicy: false,
   })
 );
 
-// Response compression (better performance)
 app.use(compression());
 
-// Prevent brute-force
 const apiLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 120, // 120 requests/min
-  message: { error: "Too many requests, slow down." },
+  windowMs: 60 * 1000,
+  max: 120,
   standardHeaders: true,
-  legacyHeaders: false,
+  message: { error: "Too many requests, slow down." },
 });
+
 app.use("/api", apiLimiter);
 
-// Strict CORS
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   })
 );
 
@@ -63,44 +82,43 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Request logging
 if (process.env.NODE_ENV !== "production") {
   app.use(morgan("dev"));
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                Database Init                                */
-/* -------------------------------------------------------------------------- */
+// --------------------------------------------------------------------------
+// Database
+// --------------------------------------------------------------------------
 
 initDB();
 
-/* -------------------------------------------------------------------------- */
-/*                                   Cron Job                                  */
-/* -------------------------------------------------------------------------- */
+// --------------------------------------------------------------------------
+// Cron Jobs
+// --------------------------------------------------------------------------
 
-// Auto-stop expired Docker containers every 1 minute
 setInterval(() => {
   autoStopExpiredContainers().catch((err) =>
     console.error("Auto-stop job error:", err)
   );
-}, 60 * 1000);
+}, 60000);
 
-/* -------------------------------------------------------------------------- */
-/*                                   Routes                                    */
-/* -------------------------------------------------------------------------- */
+// --------------------------------------------------------------------------
+// Routes
+// --------------------------------------------------------------------------
 
-app.use("/api/challenges", require("./src/routes/challengeRoutes"));
-app.use("/api/leaderboard", require("./src/routes/leaderboardRoutes"));
-app.use("/api/user", require("./src/routes/userRoutes"));
-app.use("/api/flag", require("./src/routes/flagRoutes"));
-app.use("/api/auth", require("./src/routes/authRoutes"));
-app.use("/api/admin", require("./src/routes/adminRoutes"));
-app.use("/api/team", require("./src/routes/teamRoutes"));
-app.use("/api/profile", require("./src/routes/profileRoutes"));
+app.use("/api/challenges", challengeRoutes);
+app.use("/api/leaderboard", leaderboardRoutes);
+app.use("/api/user", userRoutes);
+app.use("/api/flag", flagRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/team", teamRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/announcement", announcementRoutes);
 
-/* -------------------------------------------------------------------------- */
-/*                           Static File Handling                              */
-/* -------------------------------------------------------------------------- */
+// --------------------------------------------------------------------------
+// Static
+// --------------------------------------------------------------------------
 
 app.use(
   "/uploads",
@@ -110,47 +128,41 @@ app.use(
   })
 );
 
-/* -------------------------------------------------------------------------- */
-/*                        Secure File Download Endpoint                        */
-/* -------------------------------------------------------------------------- */
+// --------------------------------------------------------------------------
+// Downloads
+// --------------------------------------------------------------------------
 
 app.get("/api/download/:filename", (req, res) => {
-  try {
-    const fileName = req.params.filename;
+  const file = req.params.filename;
 
-    // Validate filename carefully
-    if (!/^[a-zA-Z0-9._-]+$/.test(fileName)) {
-      return res.status(400).json({ error: "Invalid filename" });
-    }
-
-    const filePath = path.join(__dirname, "uploads", fileName);
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: "File not found" });
-    }
-
-    res.download(filePath, fileName);
-  } catch (err) {
-    console.error("Download error:", err);
-    res.status(500).json({ error: "Internal server error" });
+  if (!/^[a-zA-Z0-9._-]+$/.test(file)) {
+    return res.status(400).json({ error: "Invalid filename" });
   }
+
+  const filePath = path.join(__dirname, "uploads", file);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "File not found" });
+  }
+
+  res.download(filePath, file);
 });
 
-/* -------------------------------------------------------------------------- */
-/*                                 Health Check                                */
-/* -------------------------------------------------------------------------- */
+// --------------------------------------------------------------------------
+// Health
+// --------------------------------------------------------------------------
 
 app.get("/api/health", (req, res) => {
   res.json({
     ok: true,
-    env: process.env.NODE_ENV || "development",
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(),
+    mode: process.env.NODE_ENV ?? "dev",
   });
 });
 
-/* -------------------------------------------------------------------------- */
-/*                             Global Error Handler                             */
-/* -------------------------------------------------------------------------- */
+// --------------------------------------------------------------------------
+// Error Handler
+// --------------------------------------------------------------------------
 
 app.use((err, req, res, next) => {
   console.error("🔥 Global Error:", err);
@@ -159,17 +171,21 @@ app.use((err, req, res, next) => {
     .json({ error: err.message || "Internal Server Error" });
 });
 
-/* -------------------------------------------------------------------------- */
-/*                                   Startup                                   */
-/* -------------------------------------------------------------------------- */
+// --------------------------------------------------------------------------
+// Start Server
+// --------------------------------------------------------------------------
 
-app.listen(PORT, () =>
-  console.log(`Project_X API running securely on port ${PORT}`)
+server.listen(PORT, () =>
+  console.log(`🚀 Project_X API + WebSocket running on ${PORT}`)
 );
 
-process.on("unhandledRejection", (err) => {
-  console.error("UNHANDLED PROMISE REJECTION:", err);
-});
+// --------------------------------------------------------------------------
+// Fail-safe
+// --------------------------------------------------------------------------
+
+process.on("unhandledRejection", (err) =>
+  console.error("UNHANDLED REJECTION:", err)
+);
 
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err);

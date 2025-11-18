@@ -1,33 +1,25 @@
 /**
- * User Routes
- * -----------
- * Handles:
- *  - Creating or retrieving a user
- *  - Fetching user details
- *  - Toggling challenge solve status
+ * User Routes (ESM)
+ * -----------------
  */
 
-const express = require("express");
-const {
+import express from "express";
+import {
   createOrGetUser,
   getUser,
   toggleSolve,
-} = require("../controllers/userController");
+} from "../controllers/userController.js";
 
 const router = express.Router();
 
-/* -------------------------------------------------------------------------- */
-/*                                   Routes                                    */
-/* -------------------------------------------------------------------------- */
-
 /**
- * Create a user if not exists, otherwise return existing user
+ * Create or retrieve a user
  * POST /api/user
  */
 router.post("/", createOrGetUser);
 
 /**
- * Toggle a user's solve status on a challenge
+ * Toggle solve status
  * POST /api/user/solve
  */
 router.post("/solve", toggleSolve);
@@ -38,4 +30,4 @@ router.post("/solve", toggleSolve);
  */
 router.get("/:username", getUser);
 
-module.exports = router;
+export default router;

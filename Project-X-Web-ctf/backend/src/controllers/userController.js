@@ -1,13 +1,13 @@
 /**
- * User Controller
- * ---------------
+ * User Controller (ESM + Optimized)
+ * ---------------------------------
  * Handles:
  *  - Creating a user if not exists
  *  - Fetching a user with solve history
  *  - Toggling a solve entry
  */
 
-const { prisma } = require("../config/db");
+import prisma from "../config/db.js";
 
 /* -------------------------------------------------------------------------- */
 /*                       Create or Fetch Existing User                         */
@@ -15,9 +15,9 @@ const { prisma } = require("../config/db");
 
 /**
  * Create a new user if they do not exist, otherwise return existing user.
- * @route POST /api/user
+ * POST /api/user
  */
-const createOrGetUser = async (req, res) => {
+export async function createOrGetUser(req, res) {
   const { username } = req.body;
 
   if (!username || typeof username !== "string") {
@@ -25,8 +25,13 @@ const createOrGetUser = async (req, res) => {
   }
 
   try {
-    let user = await prisma.user.findUnique({ where: { username } });
+    // Fast fetch (indexed field)
+    let user = await prisma.user.findUnique({
+      where: { username },
+      select: { id: true, username: true, createdAt: true },
+    });
 
+    // Create if missing
     if (!user) {
       user = await prisma.user.create({
         data: { username },
@@ -36,10 +41,10 @@ const createOrGetUser = async (req, res) => {
 
     return res.json(user);
   } catch (error) {
-    console.error("Error creating or fetching user:", error);
+    console.error("createOrGetUser error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
-};
+}
 
 /* -------------------------------------------------------------------------- */
 /*                               Get User Profile                              */
@@ -47,9 +52,9 @@ const createOrGetUser = async (req, res) => {
 
 /**
  * Fetch a public user profile including solved challenges.
- * @route GET /api/user/:username
+ * GET /api/user/:username
  */
-const getUser = async (req, res) => {
+export async function getUser(req, res) {
   const { username } = req.params;
 
   if (!username || typeof username !== "string") {
@@ -67,6 +72,7 @@ const getUser = async (req, res) => {
       },
     });
 
+    // Return empty if user not found (keeps UI consistent)
     if (!user) {
       return res.json({
         id: null,
@@ -78,13 +84,13 @@ const getUser = async (req, res) => {
     return res.json({
       id: user.id,
       username: user.username,
-      solved: user.solved || [],
+      solved: user.solved ?? [],
     });
   } catch (error) {
-    console.error("Error fetching user:", error);
+    console.error("getUser error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
-};
+}
 
 /* -------------------------------------------------------------------------- */
 /*                                 Toggle Solve                                */
@@ -92,36 +98,38 @@ const getUser = async (req, res) => {
 
 /**
  * Toggle solved status for a user on a challenge.
- * If solve exists → remove it
- * If solve doesn't exist → add it
- * @route POST /api/user/toggle-solve
+ * POST /api/user/toggle-solve
  */
-const toggleSolve = async (req, res) => {
+export async function toggleSolve(req, res) {
   const { username, challengeId } = req.body;
 
   if (!username || !challengeId) {
-    return res.status(400).json({ error: "username and challengeId required" });
+    return res.status(400).json({
+      error: "username and challengeId required",
+    });
   }
 
   try {
+    // Fetch user fast
     const user = await prisma.user.findUnique({
       where: { username },
+      select: { id: true },
     });
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const existingSolve = await prisma.solved.findFirst({
-      where: {
-        userId: user.id,
-        challengeId: Number(challengeId),
-      },
+    const cId = Number(challengeId);
+
+    const existing = await prisma.solved.findFirst({
+      where: { userId: user.id, challengeId: cId },
+      select: { id: true },
     });
 
-    // If already solved → remove it
-    if (existingSolve) {
-      await prisma.solved.delete({ where: { id: existingSolve.id } });
+    // If solved → remove it
+    if (existing) {
+      await prisma.solved.delete({ where: { id: existing.id } });
 
       return res.json({
         status: "removed",
@@ -129,12 +137,9 @@ const toggleSolve = async (req, res) => {
       });
     }
 
-    // Otherwise create solve entry
+    // Otherwise create solve
     const solve = await prisma.solved.create({
-      data: {
-        userId: user.id,
-        challengeId: Number(challengeId),
-      },
+      data: { userId: user.id, challengeId: cId },
     });
 
     return res.json({
@@ -143,16 +148,12 @@ const toggleSolve = async (req, res) => {
       solve,
     });
   } catch (error) {
-    console.error("Error toggling solve:", error);
+    console.error("toggleSolve error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
-};
+}
 
-/* -------------------------------------------------------------------------- */
-/*                                   Exports                                   */
-/* -------------------------------------------------------------------------- */
-
-module.exports = {
+export default {
   createOrGetUser,
   getUser,
   toggleSolve,

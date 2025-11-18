@@ -1,18 +1,14 @@
 /**
- * Flag Submission Routes
- * -----------------------
+ * Flag Submission Routes (ESM)
+ * ----------------------------
  * Handles:
  *  - User flag submissions for challenges
  */
 
-const express = require("express");
-const { submitFlag } = require("../controllers/flagController");
+import express from "express";
+import { submitFlag } from "../controllers/flagController.js";
 
 const router = express.Router();
-
-/* -------------------------------------------------------------------------- */
-/*                                   Routes                                    */
-/* -------------------------------------------------------------------------- */
 
 /**
  * Submit a flag for a challenge
@@ -20,4 +16,4 @@ const router = express.Router();
  */
 router.post("/submit", submitFlag);
 
-module.exports = router;
+export default router;
