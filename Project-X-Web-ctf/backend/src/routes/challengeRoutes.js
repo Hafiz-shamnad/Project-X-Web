@@ -1,6 +1,6 @@
 /**
- * Challenge Routes (ESM)
- * ----------------------
+ * Challenge Routes (ESM + Optimized)
+ * ----------------------------------
  */
 
 import express from "express";
@@ -19,32 +19,37 @@ import {
 
 const router = express.Router();
 
-/**
- * Instance Routes (protected)
- */
-router.get("/instance/:id", authenticate, getChallengeInstance);
-router.post("/spawn/:id", authenticate, spawnChallengeInstance);
+/* ============================================================
+   PUBLIC ROUTES (no auth)
+   ============================================================ */
 
-/**
- * Public challenge list
- */
+/** Public challenge list (released only) */
 router.get("/public", getPublicChallenges);
 
-/**
- * Get all challenges
- */
+/** All challenges (metadata only) — public by your current design */
 router.get("/", getChallenges);
 
-/**
- * Get challenge metadata
- */
+/** Get specific challenge */
 router.get("/:id", getChallengeById);
 
-/**
- * Container lifecycle (protected)
- */
-router.post("/start/:id", authenticate, startChallenge);
-router.post("/stop/:id", authenticate, stopChallenge);
-router.post("/extend/:id", authenticate, extendInstance);
+/* ============================================================
+   PROTECTED ROUTES (instances, lifecycle, private data)
+   ============================================================ */
+
+/** Require authentication for all below */
+router.use(authenticate);
+
+/** Retrieve user's running instance info */
+router.get("/instance/:id", getChallengeInstance);
+
+/** Spawn a new challenge instance */
+router.post("/spawn/:id", spawnChallengeInstance);
+
+/** Container lifecycle */
+router.post("/start/:id", startChallenge);
+router.post("/stop/:id", stopChallenge);
+
+/** Extend active instance time */
+router.post("/extend/:id", extendInstance);
 
 export default router;

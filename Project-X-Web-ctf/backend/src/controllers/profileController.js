@@ -1,11 +1,11 @@
 /**
- * Profile Controller (ESM + Optimized)
+ * Profile Controller (ESM + Schema-Accurate + Optimized)
  */
 
 import prisma from "../config/db.js";
 
 /* -------------------------------------------------------------------------- */
-/*                           GET AUTHENTICATED PROFILE                         */
+/*                        GET AUTHENTICATED PROFILE                            */
 /* -------------------------------------------------------------------------- */
 
 export async function getMyProfile(req, res) {
@@ -19,15 +19,16 @@ export async function getMyProfile(req, res) {
         team: true,
         solved: {
           include: { challenge: true },
-          orderBy: { id: "desc" },
+          orderBy: { createdAt: "desc" },
         },
       },
     });
 
     if (!user) return res.status(404).json({ error: "User not found" });
 
+    /** Score calculation is based on challenge.points, not Solved.points */
     const totalPoints = user.solved.reduce(
-      (sum, s) => sum + (s.challenge?.points || 0),
+      (sum, s) => sum + (s.challenge?.points ?? 0),
       0
     );
 
@@ -38,13 +39,23 @@ export async function getMyProfile(req, res) {
       country: user.country,
       avatarUrl: user.avatarUrl,
       createdAt: user.createdAt,
-      team: user.team ? { id: user.team.id, name: user.team.name } : null,
+
+      team: user.team
+        ? {
+            id: user.team.id,
+            name: user.team.name,
+          }
+        : null,
+
       totalPoints,
+
       challengesSolved: user.solved.map((s) => ({
-        id: s.challenge.id,
+        solveId: s.id,
+        challengeId: s.challenge.id,
         name: s.challenge.name,
         category: s.challenge.category,
         points: s.challenge.points,
+        solvedAt: s.solvedAt,
       })),
     });
   } catch (err) {
@@ -66,14 +77,17 @@ export async function getPublicProfile(req, res) {
       where: { username },
       include: {
         team: true,
-        solves: { include: { challenge: true } },
+        solved: {
+          include: { challenge: true },
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const totalPoints = user.solves.reduce(
-      (a, b) => a + (b.challenge?.points || 0),
+    const totalPoints = user.solved.reduce(
+      (sum, s) => sum + (s.challenge?.points ?? 0),
       0
     );
 
@@ -82,8 +96,10 @@ export async function getPublicProfile(req, res) {
       bio: user.bio,
       country: user.country,
       avatarUrl: user.avatarUrl,
+
       team: user.team ? user.team.name : null,
-      solveCount: user.solves.length,
+
+      solveCount: user.solved.length,
       totalPoints,
     });
   } catch (err) {
@@ -93,7 +109,7 @@ export async function getPublicProfile(req, res) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                         UPDATE AUTHENTICATED PROFILE                        */
+/*                       UPDATE AUTHENTICATED PROFILE                          */
 /* -------------------------------------------------------------------------- */
 
 export async function updateMyProfile(req, res) {

@@ -1,5 +1,5 @@
-// Normalize base URL (removes trailing slashes)
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+// Normalize base URL — remove trailing slash
+const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
 
 /* -------------------------------------------------------
    Utility: Safe JSON parsing (never throws)
@@ -14,7 +14,7 @@ async function safeJsonParse(res: Response) {
 }
 
 /* -------------------------------------------------------
-   Utility: Fetch with timeout (prevents stuck requests)
+   Fetch with timeout (prevents stuck requests)
 ------------------------------------------------------- */
 function fetchWithTimeout(
   url: string,
@@ -30,7 +30,7 @@ function fetchWithTimeout(
 }
 
 /* -------------------------------------------------------
-   Unified error extractor
+   Extract meaningful backend errors
 ------------------------------------------------------- */
 function extractError(data: any, fallback: string) {
   if (!data) return fallback;
@@ -47,18 +47,19 @@ export async function apiClient<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url =
-    BASE_URL + (endpoint.startsWith("/") ? endpoint : `/${endpoint}`);
+  const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   const res = await fetchWithTimeout(
     url,
     {
-      credentials: "include",
+      ...options,
+      method: options.method || "GET",
+      credentials: "include", // necessary for cookies
       headers: {
-        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
         ...(options.headers || {}),
       },
-      ...options,
     },
     15000
   );
@@ -73,21 +74,20 @@ export async function apiClient<T = any>(
 }
 
 /* -------------------------------------------------------
-   UPLOAD CLIENT (FormData)
+   UPLOAD CLIENT (FormData — no JSON headers)
 ------------------------------------------------------- */
 export async function apiUpload<T = any>(
   endpoint: string,
   formData: FormData,
   method: string = "POST"
 ): Promise<T> {
-  const url =
-    BASE_URL + (endpoint.startsWith("/") ? endpoint : `/${endpoint}`);
+  const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   const res = await fetchWithTimeout(
     url,
     {
       method,
-      credentials: "include",
+      credentials: "include", // include JWT cookies
       body: formData,
     },
     20000
@@ -96,10 +96,8 @@ export async function apiUpload<T = any>(
   const data = await safeJsonParse(res);
 
   if (!res.ok) {
-    throw new Error(
-      extractError(data, res.statusText || "Upload failed")
-    );
+    throw new Error(extractError(data, "Upload failed"));
   }
 
-  return (data as T) || ({} as T);
+  return data as T;
 }

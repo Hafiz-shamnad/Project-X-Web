@@ -33,19 +33,22 @@ export default function LoginPage() {
           body: JSON.stringify(form),
         });
 
-        if (response.error) {
-          setStatus({ loading: false, error: response.error });
+        const role = response?.user?.role;
+
+        if (!role) {
+          setStatus({
+            loading: false,
+            error: "Invalid server response.",
+          });
           return;
         }
 
-        const role = response?.user?.role;
-
         router.push(role === "admin" ? "/admin" : "/dashboard");
-      } catch (err) {
-        console.error("Login error:", err);
+      } catch (err: any) {
         setStatus({
           loading: false,
-          error: "Unexpected server error. Please try again.",
+          error:
+            err?.message || "Unexpected server error. Please try again.",
         });
       }
     },
@@ -55,7 +58,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a0f1f] to-[#0d1b2a] text-blue-200 p-4">
       <div className="w-full max-w-sm p-8 rounded-2xl bg-white/10 backdrop-blur-xl border border-blue-500/30 shadow-xl shadow-blue-900/40 relative">
-        {/* GLOW EFFECT */}
+        {/* Glow */}
         <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-32 h-32 bg-blue-500/40 blur-3xl rounded-full pointer-events-none" />
 
         <h2 className="text-3xl font-bold mb-6 text-center text-blue-300 tracking-wide drop-shadow">
@@ -64,33 +67,29 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-5">
           {/* USERNAME */}
-          <div>
-            <input
-              name="username"
-              value={form.username}
-              onChange={handleChange}
-              required
-              placeholder="Username"
-              autoComplete="username"
-              className="w-full p-3 rounded-lg bg-[#0a0f1f]/70 border border-blue-700/40 text-blue-100 placeholder-blue-400/40 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 outline-none transition"
-            />
-          </div>
+          <input
+            name="username"
+            value={form.username}
+            onChange={handleChange}
+            required
+            placeholder="Username"
+            autoComplete="username"
+            className="w-full p-3 rounded-lg bg-[#0a0f1f]/70 border border-blue-700/40 text-blue-100 placeholder-blue-400/40 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 outline-none transition"
+          />
 
           {/* PASSWORD */}
-          <div>
-            <input
-              name="password"
-              type="password"
-              value={form.password}
-              onChange={handleChange}
-              required
-              placeholder="Password"
-              autoComplete="current-password"
-              className="w-full p-3 rounded-lg bg-[#0a0f1f]/70 border border-blue-700/40 text-blue-100 placeholder-blue-400/40 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
-            />
-          </div>
+          <input
+            name="password"
+            type="password"
+            value={form.password}
+            onChange={handleChange}
+            required
+            placeholder="Password"
+            autoComplete="current-password"
+            className="w-full p-3 rounded-lg bg-[#0a0f1f]/70 border border-blue-700/40 text-blue-100 placeholder-blue-400/40 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+          />
 
-          {/* ERROR */}
+          {/* ERROR MSG */}
           {status.error && (
             <div className="text-red-400 text-sm font-semibold bg-red-900/20 p-2 rounded border border-red-500/40 shadow-red-900/30 shadow-sm animate-pulse">
               {status.error}

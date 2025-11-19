@@ -23,7 +23,7 @@ export function useAdminModals() {
         open: true,
         title,
         message,
-        onConfirm, // safe: stored synchronously & memoized call below
+        onConfirm, // ✔ store in state so AdminPanel can call it
       });
     },
     []
@@ -56,7 +56,7 @@ export function useAdminModals() {
         title,
         message,
         label,
-        onConfirm,
+        onConfirm, // ✔ store in state
       });
     },
     []
@@ -67,7 +67,7 @@ export function useAdminModals() {
   }, []);
 
   /* ----------------------------------------
-     MEMOIZED RETURN OBJECT (prevents rerenders)
+     MEMOIZED RETURN
   ---------------------------------------- */
   return useMemo(
     () => ({

@@ -22,13 +22,13 @@ export function useChallenges({ teamId }: UseChallengesParams) {
   }, []);
 
   /* ----------------------------------------
-   * Fetch Challenges (released only)
+   * Fetch Public Challenges (no token)
    * ---------------------------------------- */
   const fetchChallenges = useCallback(async () => {
     try {
       const data = await apiFetch<Challenge[]>("/challenges");
 
-      return data.filter((c) => c.released);
+      return data.filter((c) => c.released === true);
     } catch (err) {
       console.error("Error loading challenges:", err);
       return [];
@@ -36,13 +36,15 @@ export function useChallenges({ teamId }: UseChallengesParams) {
   }, []);
 
   /* ----------------------------------------
-   * Fetch Team Solves
+   * Fetch Team Solves (protected → needs auth)
    * ---------------------------------------- */
   const fetchSolves = useCallback(async () => {
     if (!teamId) return [];
 
     try {
-      const solvedResponse = await apiFetch(`/team/${teamId}/solves`);
+      const solvedResponse = await apiFetch(`/team/${teamId}/solves`, {
+        auth: true, // IMPORTANT FOR JWT
+      });
 
       return (
         solvedResponse?.solved?.map(
@@ -56,11 +58,10 @@ export function useChallenges({ teamId }: UseChallengesParams) {
   }, [teamId]);
 
   /* ----------------------------------------
-   * Initial load + sync on dependency updates
+   * Initial load + refresh on teamId change
    * ---------------------------------------- */
   useEffect(() => {
     let cancelled = false;
-
     setLoading(true);
 
     (async () => {
@@ -82,11 +83,13 @@ export function useChallenges({ teamId }: UseChallengesParams) {
   }, [fetchChallenges, fetchSolves]);
 
   /* ----------------------------------------
-   * Manual Refresh
+   * Manual Refresh (pull to refresh)
    * ---------------------------------------- */
   const refresh = useCallback(async () => {
     setLoading(true);
+
     const [c, s] = await Promise.all([fetchChallenges(), fetchSolves()]);
+
     if (mounted.current) {
       setChallenges(c);
       setSolvedIds(s);

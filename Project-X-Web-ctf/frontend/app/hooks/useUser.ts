@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../lib/api";
 
 export interface UserProfile {
+  id?: number;
   username: string;
   teamId: number | null;
   bannedUntil: string | null;
+  role?: string;
 }
 
 interface UserState {
@@ -29,11 +31,22 @@ export function useUser() {
   useEffect(() => {
     let cancelled = false;
 
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("token")
+        : null;
+
+    // No token → no user
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     (async () => {
       try {
-        const data = await apiFetch("/auth/me");
+        const data = await apiFetch("/auth/me", { auth: true });
 
-        if (!data?.user?.username) {
+        if (!data?.user) {
           if (!cancelled) setLoading(false);
           return;
         }
@@ -52,9 +65,11 @@ export function useUser() {
         if (!cancelled) {
           setState({
             user: {
+              id: data.user.id,
               username: data.user.username,
               teamId: data.user.teamId ?? null,
               bannedUntil,
+              role: data.user.role,
             },
             bannedDate,
             isTempBanned,
@@ -63,6 +78,7 @@ export function useUser() {
         }
       } catch (err) {
         console.error("useUser /auth/me failed:", err);
+        // apiFetch already handles 401 → redirect
       } finally {
         if (!cancelled) setLoading(false);
       }
