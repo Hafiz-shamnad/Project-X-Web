@@ -2,6 +2,17 @@
  * API Client (JWT Bearer + JSON + File Upload + Production Ready)
  */
 // TOP OF api.ts
+
+function getToken() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem("token");
+  } catch {
+    return null;
+  }
+}
+
+
 export const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 /* ----------------------------------------------
@@ -27,8 +38,8 @@ export async function apiFetch<T = any>(
   const url = `${API_URL}${endpoint}`;
 
   // Load token only in browser
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = getToken();
+
 
   /* ----------------------------------------------
    * Construct Headers
