@@ -7,7 +7,7 @@ import { formatTime } from "../utils/formatTime";
 import toast from "react-hot-toast";
 
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  process.env.NEXT_PUBLIC_API_URL;
 
 interface InstanceInfo {
   port: number;
