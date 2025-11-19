@@ -1,13 +1,10 @@
-// lib/api.ts — FINAL VERSION (supports auth: true)
+// app/lib/api.ts (Bearer Token Version)
 
+// Normalize base URL
 const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
 
-interface ApiOptions extends RequestInit {
-  json?: any;
-  auth?: boolean; // <---- VERY IMPORTANT
-}
-
-async function safeParse(res: Response) {
+// ---------- safe json ----------
+async function safeJsonParse(res: Response) {
   const text = await res.text();
   try {
     return JSON.parse(text);
@@ -16,45 +13,105 @@ async function safeParse(res: Response) {
   }
 }
 
-export async function apiFetch<T = any>(
+// ---------- timeout ----------
+function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs = 15000
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("Request timeout"));
+    }, timeoutMs);
+
+    fetch(url, options)
+      .then((res) => {
+        clearTimeout(timer);
+        resolve(res);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
+// ---------- extract backend error ----------
+function extractError(data: any, fallback: string) {
+  if (!data) return fallback;
+  if (typeof data === "string") return data;
+  return data?.error || data?.message || fallback;
+}
+
+// ---------- MAIN API CLIENT ----------
+interface ApiOptions extends RequestInit {
+  json?: any;
+}
+
+export async function apiClient<T = any>(
   endpoint: string,
   options: ApiOptions = {}
 ): Promise<T> {
-  const url = `${BASE_URL}${endpoint}`;
+  const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   const method = options.method || "GET";
-  const token =
-    typeof window !== "undefined" && options.auth
-      ? localStorage.getItem("token")
-      : null;
+  const isJson = options.json !== undefined;
+
+  // Load token from localStorage (browser only)
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const headers: HeadersInit = {
     Accept: "application/json",
-    ...(options.json ? { "Content-Type": "application/json" } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(isJson ? { "Content-Type": "application/json" } : {}),
     ...(options.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  const config: RequestInit = {
+  const fetchOptions: RequestInit = {
     ...options,
     method,
-    credentials: "omit", // NO cookies
     headers,
+    credentials: "omit",       // <-- very important (no cookies)
     body:
       method !== "GET"
-        ? options.json
+        ? isJson
           ? JSON.stringify(options.json)
           : options.body
         : undefined,
   };
 
-  const res = await fetch(url, config);
-  const data = await safeParse(res);
+  const res = await fetchWithTimeout(url, fetchOptions);
+  const data = await safeJsonParse(res);
 
   if (!res.ok) {
-    const msg = data?.error || data?.message || res.statusText;
-    throw new Error(msg);
+    throw new Error(extractError(data, res.statusText));
   }
 
   return data as T;
 }
+
+// Upload (FormData)
+export async function apiUpload<T = any>(
+  endpoint: string,
+  formData: FormData,
+  method = "POST"
+): Promise<T> {
+  const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
+  const res = await fetchWithTimeout(url, {
+    method,
+    credentials: "omit",
+    body: formData,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+  const data = await safeJsonParse(res);
+
+  if (!res.ok) throw new Error(extractError(data, "Upload failed"));
+
+  return data as T;
+}
+
+export const apiFetch = apiClient; // backward compatibility
