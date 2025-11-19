@@ -1,9 +1,7 @@
-// app/lib/api.ts (Bearer Token Version)
+// app/lib/api.ts (Bearer Token version only)
 
-// Normalize base URL
 const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
 
-// ---------- safe json ----------
 async function safeJsonParse(res: Response) {
   const text = await res.text();
   try {
@@ -13,17 +11,9 @@ async function safeJsonParse(res: Response) {
   }
 }
 
-// ---------- timeout ----------
-function fetchWithTimeout(
-  url: string,
-  options: RequestInit,
-  timeoutMs = 15000
-): Promise<Response> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error("Request timeout"));
-    }, timeoutMs);
-
+function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 15000) {
+  return new Promise<Response>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Request timeout")), timeoutMs);
     fetch(url, options)
       .then((res) => {
         clearTimeout(timer);
@@ -36,28 +26,16 @@ function fetchWithTimeout(
   });
 }
 
-// ---------- extract backend error ----------
-function extractError(data: any, fallback: string) {
-  if (!data) return fallback;
-  if (typeof data === "string") return data;
-  return data?.error || data?.message || fallback;
-}
-
-// ---------- MAIN API CLIENT ----------
 interface ApiOptions extends RequestInit {
   json?: any;
 }
 
-export async function apiClient<T = any>(
-  endpoint: string,
-  options: ApiOptions = {}
-): Promise<T> {
+export async function apiClient<T = any>(endpoint: string, options: ApiOptions = {}) {
   const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   const method = options.method || "GET";
   const isJson = options.json !== undefined;
 
-  // Load token from localStorage (browser only)
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const headers: HeadersInit = {
@@ -71,7 +49,7 @@ export async function apiClient<T = any>(
     ...options,
     method,
     headers,
-    credentials: "omit",       // <-- very important (no cookies)
+    credentials: "omit", // 🔥 NO COOKIES SENT EVER
     body:
       method !== "GET"
         ? isJson
@@ -83,21 +61,16 @@ export async function apiClient<T = any>(
   const res = await fetchWithTimeout(url, fetchOptions);
   const data = await safeJsonParse(res);
 
-  if (!res.ok) {
-    throw new Error(extractError(data, res.statusText));
-  }
-
+  if (!res.ok) throw new Error(data?.error || data?.message || res.statusText);
   return data as T;
 }
 
-// Upload (FormData)
 export async function apiUpload<T = any>(
   endpoint: string,
   formData: FormData,
   method = "POST"
-): Promise<T> {
+) {
   const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
-
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const res = await fetchWithTimeout(url, {
@@ -108,10 +81,8 @@ export async function apiUpload<T = any>(
   });
 
   const data = await safeJsonParse(res);
-
-  if (!res.ok) throw new Error(extractError(data, "Upload failed"));
-
+  if (!res.ok) throw new Error(data?.error || "Upload failed");
   return data as T;
 }
 
-export const apiFetch = apiClient; // backward compatibility
+export const apiFetch = apiClient;
