@@ -2,7 +2,7 @@
 const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
 
 /* -------------------------------------------------------
-   Safe JSON parsing
+   Safe JSON parsing (never throws)
 ------------------------------------------------------- */
 async function safeJsonParse(res: Response) {
   const text = await res.text();
@@ -41,39 +41,44 @@ function extractError(data: any, fallback: string) {
 }
 
 /* -------------------------------------------------------
-   MAIN API CLIENT — FIXED (JSON)
+   MAIN API CLIENT (JSON requests)
 ------------------------------------------------------- */
 export async function apiClient<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  const url = `${BASE_URL}${
+    endpoint.startsWith("/") ? endpoint : `/${endpoint}`
+  }`;
 
-  // Handle JSON bodies properly
+  const method = options.method || "GET";
+
+  // Detect JSON body (must stringify)
   const isJsonBody =
     options.body &&
     typeof options.body === "object" &&
     !(options.body instanceof FormData);
 
+  const headers: HeadersInit = {
+    Accept: "application/json",
+    ...(options.headers || {}),
+    ...(isJsonBody ? { "Content-Type": "application/json" } : {}),
+  };
+
   const fetchOptions: RequestInit = {
     ...options,
-    method: options.method || "GET",
+    method,
     credentials: "include",
-    headers: {
-      Accept: "application/json",
-      ...(isJsonBody ? { "Content-Type": "application/json" } : {}),
-      ...(options.headers || {}),
-    },
+    headers,
     body:
-      options.method !== "GET"
+      method !== "GET"
         ? isJsonBody
-          ? JSON.stringify(options.body) // FIXED
+          ? JSON.stringify(options.body)
           : options.body
         : undefined,
   };
 
   const res = await fetchWithTimeout(url, fetchOptions);
-
   const data = await safeJsonParse(res);
 
   if (!res.ok) {
@@ -91,14 +96,16 @@ export async function apiUpload<T = any>(
   formData: FormData,
   method: string = "POST"
 ): Promise<T> {
-  const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  const url = `${BASE_URL}${
+    endpoint.startsWith("/") ? endpoint : `/${endpoint}`
+  }`;
 
   const res = await fetchWithTimeout(
     url,
     {
       method,
       credentials: "include",
-      body: formData, // do NOT set Content-Type — browser does it
+      body: formData,
     },
     20000
   );
@@ -111,3 +118,8 @@ export async function apiUpload<T = any>(
 
   return data as T;
 }
+
+/* -------------------------------------------------------
+   Backward compatibility (your code uses this)
+------------------------------------------------------- */
+export const apiFetch = apiClient;
