@@ -36,7 +36,6 @@ export function useUser() {
         ? localStorage.getItem("token")
         : null;
 
-    // No token → no user
     if (!token) {
       setLoading(false);
       return;
@@ -78,7 +77,6 @@ export function useUser() {
         }
       } catch (err) {
         console.error("useUser /auth/me failed:", err);
-        // apiFetch already handles 401 → redirect
       } finally {
         if (!cancelled) setLoading(false);
       }

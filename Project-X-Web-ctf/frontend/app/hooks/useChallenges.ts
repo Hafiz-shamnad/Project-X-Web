@@ -21,13 +21,9 @@ export function useChallenges({ teamId }: UseChallengesParams) {
     };
   }, []);
 
-  /* ----------------------------------------
-   * Fetch Public Challenges (no token)
-   * ---------------------------------------- */
   const fetchChallenges = useCallback(async () => {
     try {
       const data = await apiFetch<Challenge[]>("/challenges");
-
       return data.filter((c) => c.released === true);
     } catch (err) {
       console.error("Error loading challenges:", err);
@@ -35,21 +31,16 @@ export function useChallenges({ teamId }: UseChallengesParams) {
     }
   }, []);
 
-  /* ----------------------------------------
-   * Fetch Team Solves (protected → needs auth)
-   * ---------------------------------------- */
   const fetchSolves = useCallback(async () => {
     if (!teamId) return [];
 
     try {
-      const solvedResponse = await apiFetch(`/team/${teamId}/solves`, {
-        auth: true, // IMPORTANT FOR JWT
+      const data = await apiFetch(`/team/${teamId}/solves`, {
+        auth: true,
       });
 
       return (
-        solvedResponse?.solved?.map(
-          (s: { challengeId: number }) => s.challengeId
-        ) ?? []
+        data?.solved?.map((s: { challengeId: number }) => s.challengeId) ?? []
       );
     } catch (err) {
       console.error("Error loading solves:", err);
@@ -57,9 +48,6 @@ export function useChallenges({ teamId }: UseChallengesParams) {
     }
   }, [teamId]);
 
-  /* ----------------------------------------
-   * Initial load + refresh on teamId change
-   * ---------------------------------------- */
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -82,14 +70,9 @@ export function useChallenges({ teamId }: UseChallengesParams) {
     };
   }, [fetchChallenges, fetchSolves]);
 
-  /* ----------------------------------------
-   * Manual Refresh (pull to refresh)
-   * ---------------------------------------- */
   const refresh = useCallback(async () => {
     setLoading(true);
-
     const [c, s] = await Promise.all([fetchChallenges(), fetchSolves()]);
-
     if (mounted.current) {
       setChallenges(c);
       setSolvedIds(s);
