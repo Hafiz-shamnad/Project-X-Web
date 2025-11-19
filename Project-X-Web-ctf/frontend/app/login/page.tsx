@@ -30,7 +30,7 @@ export default function LoginPage() {
       try {
         const response = await apiFetch("/auth/login", {
           method: "POST",
-          body: JSON.stringify(form),
+          body: form as any,
         });
 
         const role = response?.user?.role;
