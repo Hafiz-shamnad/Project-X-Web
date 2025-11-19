@@ -30,39 +30,37 @@ function fetchWithTimeout(
 }
 
 /* -------------------------------------------------------
-   Extract backend error
+   Extract backend errors
 ------------------------------------------------------- */
 function extractError(data: any, fallback: string) {
   if (!data) return fallback;
   if (typeof data === "string") return data;
-  if (typeof data.error === "string") return data.error;
-  if (typeof data.message === "string") return data.message;
+  if (data.error) return data.error;
+  if (data.message) return data.message;
   return fallback;
 }
 
 /* -------------------------------------------------------
-   MAIN API CLIENT (JSON requests)
+   MAIN API CLIENT (supports json: {})
 ------------------------------------------------------- */
+interface ApiOptions extends RequestInit {
+  json?: any; // <----- ADD THIS
+}
+
 export async function apiClient<T = any>(
   endpoint: string,
-  options: RequestInit = {}
+  options: ApiOptions = {}
 ): Promise<T> {
-  const url = `${BASE_URL}${
-    endpoint.startsWith("/") ? endpoint : `/${endpoint}`
-  }`;
+  const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   const method = options.method || "GET";
 
-  // Detect JSON body (must stringify)
-  const isJsonBody =
-    options.body &&
-    typeof options.body === "object" &&
-    !(options.body instanceof FormData);
+  const isJson = options.json !== undefined;
 
   const headers: HeadersInit = {
     Accept: "application/json",
     ...(options.headers || {}),
-    ...(isJsonBody ? { "Content-Type": "application/json" } : {}),
+    ...(isJson ? { "Content-Type": "application/json" } : {}),
   };
 
   const fetchOptions: RequestInit = {
@@ -72,8 +70,8 @@ export async function apiClient<T = any>(
     headers,
     body:
       method !== "GET"
-        ? isJsonBody
-          ? JSON.stringify(options.body)
+        ? isJson
+          ? JSON.stringify(options.json)
           : options.body
         : undefined,
   };
@@ -81,24 +79,20 @@ export async function apiClient<T = any>(
   const res = await fetchWithTimeout(url, fetchOptions);
   const data = await safeJsonParse(res);
 
-  if (!res.ok) {
-    throw new Error(extractError(data, res.statusText));
-  }
+  if (!res.ok) throw new Error(extractError(data, res.statusText));
 
   return data as T;
 }
 
 /* -------------------------------------------------------
-   UPLOAD CLIENT (FormData)
+   Upload (FormData)
 ------------------------------------------------------- */
 export async function apiUpload<T = any>(
   endpoint: string,
   formData: FormData,
-  method: string = "POST"
+  method = "POST"
 ): Promise<T> {
-  const url = `${BASE_URL}${
-    endpoint.startsWith("/") ? endpoint : `/${endpoint}`
-  }`;
+  const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   const res = await fetchWithTimeout(
     url,
@@ -112,14 +106,10 @@ export async function apiUpload<T = any>(
 
   const data = await safeJsonParse(res);
 
-  if (!res.ok) {
-    throw new Error(extractError(data, "Upload failed"));
-  }
+  if (!res.ok) throw new Error(extractError(data, "Upload failed"));
 
   return data as T;
 }
 
-/* -------------------------------------------------------
-   Backward compatibility (your code uses this)
-------------------------------------------------------- */
+// For backward compatibility
 export const apiFetch = apiClient;
