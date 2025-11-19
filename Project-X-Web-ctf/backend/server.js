@@ -1,5 +1,5 @@
 /**
- * Project_X Backend (Production Hardened + JWT Bearer Compatible)
+ * Project_X Backend (FINAL FIXED)
  */
 
 import "dotenv/config";
@@ -14,11 +14,11 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 
-// DB + Jobs
+// DB
 import { initDB } from "./src/config/db.js";
 import { autoStopExpiredContainers } from "./src/jobs/autostopper.js";
 
-// WebSocket (now with JWT Bearer Auth)
+// WebSocket
 import { initWebSocketServer } from "./src/lib/ws/ws.js";
 
 // Routes
@@ -33,8 +33,6 @@ import profileRoutes from "./src/routes/profileRoutes.js";
 import announcementRoutes from "./src/routes/announcementRoutes.js";
 
 // ----------------------------------------------------------------------------
-// Setup
-// ----------------------------------------------------------------------------
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -45,7 +43,7 @@ const __dirname = path.dirname(__filename);
 const server = http.createServer(app);
 
 // ----------------------------------------------------------------------------
-// Frontend + Backend Domains
+// FRONTEND + BACKEND CONFIG
 // ----------------------------------------------------------------------------
 
 const FRONTEND = "https://project-x-web-git-main-hafiz-shds-projects.vercel.app";
@@ -55,7 +53,15 @@ console.log("🌐 FRONTEND:", FRONTEND);
 console.log("🌐 BACKEND DOMAIN:", BACKEND_DOMAIN);
 
 // ----------------------------------------------------------------------------
-// Security Middlewares
+// ORDER IS CRITICAL: Body parser MUST be FIRST
+// ----------------------------------------------------------------------------
+
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+// ----------------------------------------------------------------------------
+// Security
 // ----------------------------------------------------------------------------
 
 app.use(
@@ -66,49 +72,43 @@ app.use(
 );
 
 app.use(compression());
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
-
-// Needed for Railway + Vercel proxy IP trust
 app.set("trust proxy", 1);
 
 // ----------------------------------------------------------------------------
-// CORS — Full JWT Bearer Safe
+// CORS (FULLY FIXED)
 // ----------------------------------------------------------------------------
 
 app.use(
   cors({
     origin: FRONTEND,
-    credentials: true, // allow cookies if needed (legacy support)
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-// Preflight support (fixed for Node 22)
+// Preflight support (Node 22 + Express 5 fixed)
 app.options(/.*/, (req, res) => {
   res.header("Access-Control-Allow-Origin", FRONTEND);
   res.header("Access-Control-Allow-Credentials", "true");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
   res.sendStatus(200);
 });
 
 // ----------------------------------------------------------------------------
-// Rate Limiter
+// Rate Limit
 // ----------------------------------------------------------------------------
 
 app.use(
   rateLimit({
     windowMs: 60_000,
     max: 200,
-    standardHeaders: true,
   })
 );
 
 // ----------------------------------------------------------------------------
-// Init DB + Jobs + WebSocket
+// DB / Jobs / WS
 // ----------------------------------------------------------------------------
 
 initDB();
@@ -116,7 +116,7 @@ autoStopExpiredContainers?.();
 initWebSocketServer(server);
 
 // ----------------------------------------------------------------------------
-// API Routes
+// API ROUTES
 // ----------------------------------------------------------------------------
 
 app.use("/api/challenges", challengeRoutes);
@@ -130,7 +130,7 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/announcement", announcementRoutes);
 
 // ----------------------------------------------------------------------------
-// Static Files (Uploads)
+// Static files
 // ----------------------------------------------------------------------------
 
 app.use(
@@ -140,6 +140,10 @@ app.use(
     maxAge: "7d",
   })
 );
+
+// ----------------------------------------------------------------------------
+// Download
+// ----------------------------------------------------------------------------
 
 app.get("/api/download/:file", (req, res) => {
   const file = req.params.file;
@@ -153,19 +157,15 @@ app.get("/api/download/:file", (req, res) => {
 });
 
 // ----------------------------------------------------------------------------
-// Health Check
+// Health
 // ----------------------------------------------------------------------------
 
 app.get("/api/health", (req, res) => {
-  res.json({
-    ok: true,
-    time: new Date(),
-    env: process.env.NODE_ENV,
-  });
+  res.json({ ok: true, time: new Date() });
 });
 
 // ----------------------------------------------------------------------------
-// Error Handler
+// Error handler
 // ----------------------------------------------------------------------------
 
 app.use((err, req, res, next) => {
