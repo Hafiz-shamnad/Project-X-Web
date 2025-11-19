@@ -1,6 +1,11 @@
 /**
  * API Client (JWT Bearer + JSON + File Upload + Production Ready)
  */
+// TOP OF api.ts
+console.log("🔥 API FILE LOADED (server)");
+if (typeof window !== "undefined") {
+  console.log("🔥 API FILE LOADED (client)");
+}
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL;
 console.log("API_URL FROM FRONTEND:", API_URL);
