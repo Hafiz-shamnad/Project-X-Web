@@ -85,7 +85,7 @@ export default function Navbar() {
     const loadUser = async () => {
       try {
         const res = await fetch(`${BACKEND_URL}/auth/me`, {
-          credentials: "include",
+          credentials: "omit",
         });
         if (!active) return;
 
