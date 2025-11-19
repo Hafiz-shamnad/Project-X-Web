@@ -2,7 +2,7 @@
 const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
 
 /* -------------------------------------------------------
-   Utility: Safe JSON parsing (never throws)
+   Safe JSON parsing
 ------------------------------------------------------- */
 async function safeJsonParse(res: Response) {
   const text = await res.text();
@@ -14,7 +14,7 @@ async function safeJsonParse(res: Response) {
 }
 
 /* -------------------------------------------------------
-   Fetch with timeout (prevents stuck requests)
+   Timeout wrapper
 ------------------------------------------------------- */
 function fetchWithTimeout(
   url: string,
@@ -30,7 +30,7 @@ function fetchWithTimeout(
 }
 
 /* -------------------------------------------------------
-   Extract meaningful backend errors
+   Extract backend error
 ------------------------------------------------------- */
 function extractError(data: any, fallback: string) {
   if (!data) return fallback;
@@ -41,7 +41,7 @@ function extractError(data: any, fallback: string) {
 }
 
 /* -------------------------------------------------------
-   MAIN API CLIENT (JSON requests)
+   MAIN API CLIENT — FIXED (JSON)
 ------------------------------------------------------- */
 export async function apiClient<T = any>(
   endpoint: string,
@@ -49,20 +49,30 @@ export async function apiClient<T = any>(
 ): Promise<T> {
   const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
-  const res = await fetchWithTimeout(
-    url,
-    {
-      ...options,
-      method: options.method || "GET",
-      credentials: "include", // necessary for cookies
-      headers: {
-        Accept: "application/json",
-        ...(options.body ? { "Content-Type": "application/json" } : {}),
-        ...(options.headers || {}),
-      },
+  // Handle JSON bodies properly
+  const isJsonBody =
+    options.body &&
+    typeof options.body === "object" &&
+    !(options.body instanceof FormData);
+
+  const fetchOptions: RequestInit = {
+    ...options,
+    method: options.method || "GET",
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      ...(isJsonBody ? { "Content-Type": "application/json" } : {}),
+      ...(options.headers || {}),
     },
-    15000
-  );
+    body:
+      options.method !== "GET"
+        ? isJsonBody
+          ? JSON.stringify(options.body) // FIXED
+          : options.body
+        : undefined,
+  };
+
+  const res = await fetchWithTimeout(url, fetchOptions);
 
   const data = await safeJsonParse(res);
 
@@ -74,7 +84,7 @@ export async function apiClient<T = any>(
 }
 
 /* -------------------------------------------------------
-   UPLOAD CLIENT (FormData — no JSON headers)
+   UPLOAD CLIENT (FormData)
 ------------------------------------------------------- */
 export async function apiUpload<T = any>(
   endpoint: string,
@@ -87,8 +97,8 @@ export async function apiUpload<T = any>(
     url,
     {
       method,
-      credentials: "include", // include JWT cookies
-      body: formData,
+      credentials: "include",
+      body: formData, // do NOT set Content-Type — browser does it
     },
     20000
   );
