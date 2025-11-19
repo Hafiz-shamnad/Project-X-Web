@@ -1,19 +1,31 @@
-/**
- * Authentication Middleware (ESM)
- * -------------------------------
- */
-
+// src/middlewares/auth.js
 import jwt from "jsonwebtoken";
 
+const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
+
+/**
+ * Authenticate using:
+ *  1) Authorization: Bearer <token>
+ *  2) Fallback: cookie "token" (backward compatibility)
+ */
 export function authenticate(req, res, next) {
   try {
-    const token = req.cookies?.token;
+    const auth = req.headers?.authorization;
+    let token = null;
+
+    // Prefer header
+    if (auth && typeof auth === "string" && auth.startsWith("Bearer ")) {
+      token = auth.split(" ")[1];
+    } else {
+      // Fallback to cookie
+      token = req.cookies?.token || null;
+    }
+
     if (!token) {
       return res.status(401).json({ error: "Authentication token missing" });
     }
 
-    const secret = process.env.JWT_SECRET || "supersecretkey";
-    const decoded = jwt.verify(token, secret);
+    const decoded = jwt.verify(token, JWT_SECRET);
 
     const userId = decoded.userId || decoded.id;
     if (!userId) {
@@ -28,7 +40,7 @@ export function authenticate(req, res, next) {
 
     next();
   } catch (err) {
-    console.error("Authentication error:", err.message);
+    console.error("Authentication error:", err.message || err);
     return res.status(401).json({ error: "Invalid or expired token" });
   }
 }

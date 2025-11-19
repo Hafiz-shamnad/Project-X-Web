@@ -9,7 +9,7 @@ export function useTeams() {
   const [loading, setLoading] = useState(false);
 
   /* ------------------------------------------
-     FETCH TEAMS (memoized + safe)
+     FETCH TEAMS
   ------------------------------------------- */
   const fetchTeams = useCallback(async () => {
     setLoading(true);
@@ -22,7 +22,7 @@ export function useTeams() {
   }, []);
 
   /* ------------------------------------------
-     ACTIONS (memoized, no stale closures)
+     ACTIONS (auto-refresh)
   ------------------------------------------- */
   const banTeam = useCallback(
     async (id: number, mins: number) => {
@@ -49,7 +49,7 @@ export function useTeams() {
   );
 
   /* ------------------------------------------
-     Memoized return to prevent re-renders
+     MEMOIZED RETURN
   ------------------------------------------- */
   return useMemo(
     () => ({

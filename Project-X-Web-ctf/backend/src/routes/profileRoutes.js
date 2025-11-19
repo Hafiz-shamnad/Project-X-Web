@@ -1,6 +1,10 @@
 /**
- * Profile Routes (ESM)
- * --------------------
+ * Profile Routes (ESM + Secure + Optimized)
+ * -----------------------------------------
+ * Handles:
+ *  - Authenticated user's profile
+ *  - Profile updates
+ *  - Public profile pages
  */
 
 import express from "express";
@@ -14,19 +18,21 @@ import {
 
 const router = express.Router();
 
-/**
- * Authenticated profile
- */
-router.get("/me", authenticate, getMyProfile);
+/* ============================
+   AUTHENTICATED PROFILE ACTIONS
+   ============================ */
+router.use("/me", authenticate);
 
-/**
- * Update profile
- */
-router.put("/me", authenticate, updateMyProfile);
+/** My profile */
+router.get("/me", getMyProfile);
 
-/**
- * Public profile
- */
+/** Update my profile */
+router.put("/me", updateMyProfile);
+
+/* ============================
+   PUBLIC PROFILE LOOKUP
+   ============================ */
+/** Public profile by username */
 router.get("/:username", getPublicProfile);
 
 export default router;

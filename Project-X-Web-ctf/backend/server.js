@@ -1,5 +1,5 @@
 /**
- * Project_X - Production Server (ESM Version)
+ * Project_X Backend (Production Hardened + JWT Bearer Compatible)
  */
 
 import "dotenv/config";
@@ -8,18 +8,17 @@ import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
-import morgan from "morgan";
-import path from "path";
-import fs from "fs";
 import compression from "compression";
 import http from "http";
+import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 
 // DB + Jobs
 import { initDB } from "./src/config/db.js";
 import { autoStopExpiredContainers } from "./src/jobs/autostopper.js";
 
-// WebSocket
+// WebSocket (now with JWT Bearer Auth)
 import { initWebSocketServer } from "./src/lib/ws/ws.js";
 
 // Routes
@@ -33,9 +32,9 @@ import teamRoutes from "./src/routes/teamRoutes.js";
 import profileRoutes from "./src/routes/profileRoutes.js";
 import announcementRoutes from "./src/routes/announcementRoutes.js";
 
-// --------------------------------------------------------------------------
-// Init
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// Setup
+// ----------------------------------------------------------------------------
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -43,128 +42,82 @@ const PORT = process.env.PORT || 4000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// WebSocket server
 const server = http.createServer(app);
 
-// --------------------------------------------------------------------------
-// ORIGIN NORMALIZER (Fixes all CORS mismatch bugs)
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// Frontend + Backend Domains
+// ----------------------------------------------------------------------------
 
-function normalizeOrigin(origin) {
-  if (!origin) return null;
-  try {
-    if (!origin.startsWith("http")) origin = "https://" + origin;
-    const u = new URL(origin);
-    return `${u.protocol}//${u.hostname}${u.port ? ":" + u.port : ""}`;
-  } catch {
-    return null;
-  }
-}
+const FRONTEND = "https://project-x-web-git-main-hafiz-shds-projects.vercel.app";
+const BACKEND_DOMAIN = "project-x-backend-production-0313.up.railway.app";
 
-const frontend = normalizeOrigin(process.env.FRONTEND_URL);
-const allowedOrigins = [
-  "http://localhost:3000",
-  frontend,
-].filter(Boolean);
+console.log("🌐 FRONTEND:", FRONTEND);
+console.log("🌐 BACKEND DOMAIN:", BACKEND_DOMAIN);
 
-console.log("Allowed Origins:", allowedOrigins);
-
-// --------------------------------------------------------------------------
-// Security
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// Security Middlewares
+// ----------------------------------------------------------------------------
 
 app.use(
   helmet({
     contentSecurityPolicy: false,
-    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
     crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
 
 app.use(compression());
-
-app.use(
-  rateLimit({
-    windowMs: 60 * 1000,
-    max: 120,
-    standardHeaders: true,
-  })
-);
-
-// --------------------------------------------------------------------------
-// CORS CONFIG
-// --------------------------------------------------------------------------
-
-app.set("trust proxy", 1);
-app.use(
-  cors({
-    origin: (origin, cb) => {
-      if (!origin) return cb(null, true);
-
-      origin = normalizeOrigin(origin);
-
-      const ok =
-        allowedOrigins.includes(origin) ||
-        origin?.endsWith(".vercel.app");
-
-      if (ok) return cb(null, true);
-
-      console.log("❌ BLOCKED ORIGIN:", origin);
-      return cb(new Error("CORS Forbidden"), false);
-    },
-    credentials: true,
-  })
-);
-
-// * Minimal fallback headers
-app.use((req, res, next) => {
-  if (req.headers.origin) {
-    res.header("Access-Control-Allow-Origin", req.headers.origin);
-  }
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  if (req.method === "OPTIONS") return res.sendStatus(200);
-  next();
-});
-
-// --------------------------------------------------------------------------
-// Body + Cookies
-// --------------------------------------------------------------------------
-
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-if (process.env.NODE_ENV !== "production") {
-  app.use(morgan("dev"));
-}
+// Needed for Railway + Vercel proxy IP trust
+app.set("trust proxy", 1);
 
-// --------------------------------------------------------------------------
-// Database
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// CORS — Full JWT Bearer Safe
+// ----------------------------------------------------------------------------
+
+app.use(
+  cors({
+    origin: FRONTEND,
+    credentials: true, // allow cookies if needed (legacy support)
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// Preflight support (fixed for Node 22)
+app.options(/.*/, (req, res) => {
+  res.header("Access-Control-Allow-Origin", FRONTEND);
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.sendStatus(200);
+});
+
+// ----------------------------------------------------------------------------
+// Rate Limiter
+// ----------------------------------------------------------------------------
+
+app.use(
+  rateLimit({
+    windowMs: 60_000,
+    max: 200,
+    standardHeaders: true,
+  })
+);
+
+// ----------------------------------------------------------------------------
+// Init DB + Jobs + WebSocket
+// ----------------------------------------------------------------------------
 
 initDB();
-
-// --------------------------------------------------------------------------
-// WebSocket INIT (after DB)
-// --------------------------------------------------------------------------
-
+autoStopExpiredContainers?.();
 initWebSocketServer(server);
 
-// --------------------------------------------------------------------------
-// Cron Jobs
-// --------------------------------------------------------------------------
-
-setInterval(() => {
-  autoStopExpiredContainers().catch((err) =>
-    console.error("Auto-stop job error:", err)
-  );
-}, 60000);
-
-// --------------------------------------------------------------------------
-// Routes
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// API Routes
+// ----------------------------------------------------------------------------
 
 app.use("/api/challenges", challengeRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
@@ -176,9 +129,9 @@ app.use("/api/team", teamRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/announcement", announcementRoutes);
 
-// --------------------------------------------------------------------------
-// Static Uploads
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// Static Files (Uploads)
+// ----------------------------------------------------------------------------
 
 app.use(
   "/uploads",
@@ -188,63 +141,42 @@ app.use(
   })
 );
 
-// --------------------------------------------------------------------------
-// Downloads
-// --------------------------------------------------------------------------
+app.get("/api/download/:file", (req, res) => {
+  const file = req.params.file;
+  const filePath = path.join(__dirname, "uploads", file);
 
-app.get("/api/download/:filename", (req, res) => {
-  const file = req.params.filename;
-  if (!/^[a-zA-Z0-9._-]+$/.test(file))
-    return res.status(400).json({ error: "Invalid filename" });
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "Not found" });
+  }
 
-  const filepath = path.join(__dirname, "uploads", file);
-  if (!fs.existsSync(filepath))
-    return res.status(404).json({ error: "File not found" });
-
-  res.download(filepath, file);
+  res.download(filePath);
 });
 
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Health Check
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 app.get("/api/health", (req, res) => {
   res.json({
     ok: true,
-    timestamp: new Date(),
-    node: process.version,
-    mode: process.env.NODE_ENV || "dev",
+    time: new Date(),
+    env: process.env.NODE_ENV,
   });
 });
 
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Error Handler
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 app.use((err, req, res, next) => {
-  console.error("🔥 Global Error:", err);
-  res.status(err.status || 500).json({
-    error: err.message || "Server error",
-  });
+  console.error("🔥 ERROR:", err);
+  res.status(500).json({ error: err.message || "Server error" });
 });
 
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Start Server
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
-server.listen(PORT, () =>
-  console.log(`🚀 Project_X API + WS running on port ${PORT}`)
-);
-
-// --------------------------------------------------------------------------
-// Fail-safe
-// --------------------------------------------------------------------------
-
-process.on("unhandledRejection", (e) =>
-  console.error("UNHANDLED:", e)
-);
-
-process.on("uncaughtException", (e) => {
-  console.error("UNCAUGHT:", e);
-  process.exit(1);
+server.listen(PORT, () => {
+  console.log(`🚀 Project_X backend running on port ${PORT}`);
 });

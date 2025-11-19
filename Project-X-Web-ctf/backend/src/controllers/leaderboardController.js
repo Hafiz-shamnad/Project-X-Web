@@ -1,5 +1,5 @@
 /**
- * Leaderboard Controller (ESM + Optimized)
+ * Leaderboard Controller (ESM + Schema-Accurate + Optimized)
  */
 
 import prisma from "../config/db.js";
@@ -14,9 +14,7 @@ export async function getLeaderboard(req, res) {
       include: {
         solved: {
           include: {
-            challenge: {
-              select: { id: true, points: true }
-            }
+            challenge: { select: { id: true, points: true } }
           }
         }
       }
@@ -25,7 +23,7 @@ export async function getLeaderboard(req, res) {
     const leaderboard = users
       .map((u) => {
         const score = u.solved.reduce(
-          (sum, s) => sum + (s.challenge?.points || 0),
+          (sum, s) => sum + (s.challenge?.points ?? 0),
           0
         );
 
@@ -35,14 +33,17 @@ export async function getLeaderboard(req, res) {
           score,
           solved: u.solved.length,
           solves: u.solved.map((s) => ({
-            challengeId: s.challenge.id,
+            challengeId: s.challengeId,
             points: s.challenge.points,
             createdAt: s.createdAt
           }))
         };
       })
       .sort((a, b) => b.score - a.score)
-      .map((u, i) => ({ rank: i + 1, ...u }));
+      .map((entry, index) => ({
+        rank: index + 1,
+        ...entry
+      }));
 
     return res.json(leaderboard);
   } catch (err) {
@@ -62,32 +63,40 @@ export async function getTeamLeaderboard(req, res) {
         members: {
           include: {
             solved: {
-              include: {
-                challenge: { select: { id: true, points: true } }
-              }
+              include: { challenge: { select: { id: true, points: true } } }
             }
           }
+        },
+        solved: {
+          include: { challenge: true }
         }
       }
     });
 
+    const now = new Date();
+
     const leaderboard = teams
-      .filter((t) => !t.bannedUntil || t.bannedUntil < new Date())
+      // Only show teams not under active ban
+      .filter((t) => !t.bannedUntil || new Date(t.bannedUntil) <= now)
       .map((team) => {
-        const solves = team.members.flatMap((m) => m.solved);
+        // Member solves
+        const memberSolves = team.members.flatMap((m) => m.solved);
 
-        // unique solves by challengeId
-        const uniqueMap = new Map();
-        for (const s of solves) {
-          if (!uniqueMap.has(s.challenge.id)) {
-            uniqueMap.set(s.challenge.id, s);
-          }
-        }
+        // Team solves (rarely used, but schema supports it)
+        const teamSolves = team.solved ?? [];
 
-        const unique = [...uniqueMap.values()];
+        // Combine and dedupe
+        const allSolves = [...memberSolves, ...teamSolves];
+
+        const unique = Array.from(
+          allSolves.reduce((map, s) => {
+            if (!map.has(s.challengeId)) map.set(s.challengeId, s);
+            return map;
+          }, new Map()).values()
+        );
 
         const rawScore = unique.reduce(
-          (sum, s) => sum + (s.challenge?.points || 0),
+          (sum, s) => sum + (s.challenge?.points ?? 0),
           0
         );
 
@@ -103,14 +112,17 @@ export async function getTeamLeaderboard(req, res) {
           penaltyPoints: penalty,
           bannedUntil: team.bannedUntil,
           solves: unique.map((s) => ({
-            challengeId: s.challenge.id,
+            challengeId: s.challengeId,
             points: s.challenge.points,
             createdAt: s.createdAt
-          }))
+          })),
         };
       })
       .sort((a, b) => b.score - a.score)
-      .map((team, i) => ({ rank: i + 1, ...team }));
+      .map((entry, index) => ({
+        rank: index + 1,
+        ...entry
+      }));
 
     return res.json(leaderboard);
   } catch (err) {
@@ -126,7 +138,9 @@ export async function getTeamLeaderboard(req, res) {
 export async function getTeamMembersLeaderboard(req, res) {
   try {
     const teamId = Number(req.params.id);
-    if (isNaN(teamId)) return res.status(400).json({ error: "Invalid team ID" });
+    if (isNaN(teamId)) {
+      return res.status(400).json({ error: "Invalid team ID" });
+    }
 
     const team = await prisma.team.findUnique({
       where: { id: teamId },
@@ -146,7 +160,7 @@ export async function getTeamMembersLeaderboard(req, res) {
     const leaderboard = team.members
       .map((m) => {
         const score = m.solved.reduce(
-          (sum, s) => sum + (s.challenge?.points || 0),
+          (sum, s) => sum + (s.challenge?.points ?? 0),
           0
         );
 
@@ -156,14 +170,17 @@ export async function getTeamMembersLeaderboard(req, res) {
           score,
           solved: m.solved.length,
           solves: m.solved.map((s) => ({
-            challengeId: s.challenge.id,
+            challengeId: s.challengeId,
             points: s.challenge.points,
             createdAt: s.createdAt
-          }))
+          })),
         };
       })
       .sort((a, b) => b.score - a.score)
-      .map((m, i) => ({ rank: i + 1, ...m }));
+      .map((entry, index) => ({
+        rank: index + 1,
+        ...entry
+      }));
 
     return res.json({
       teamId: team.id,
@@ -179,5 +196,5 @@ export async function getTeamMembersLeaderboard(req, res) {
 export default {
   getLeaderboard,
   getTeamLeaderboard,
-  getTeamMembersLeaderboard
+  getTeamMembersLeaderboard,
 };

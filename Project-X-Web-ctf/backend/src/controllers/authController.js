@@ -1,25 +1,13 @@
-/**
- * Authentication Controller (ESM + Optimized)
- * -------------------------------------------
- * Handles:
- *  - Registration
- *  - Login
- *  - Logout
- *  - Session check
- */
-
+// src/controllers/authController.js
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import prisma from "../config/db.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
-const JWT_EXPIRES_IN = "7d";
-const BCRYPT_ROUNDS = 12;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS || 12);
 
-/* -------------------------------------------------------------------------- */
-/*                              Helper: Generate JWT                           */
-/* -------------------------------------------------------------------------- */
-
+// Create token
 function generateToken(user) {
   return jwt.sign(
     { userId: user.id, username: user.username, role: user.role },
@@ -28,46 +16,30 @@ function generateToken(user) {
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                           Cookie Configuration                              */
-/* -------------------------------------------------------------------------- */
-
-const cookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production", // true on vercel
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-  partitioned: true, 
-  path: "/",
-  maxAge: 7 * 86400 * 1000,
-};
-
-
-/* -------------------------------------------------------------------------- */
-/*                                    REGISTER                                 */
-/* -------------------------------------------------------------------------- */
-
+/* REGISTER */
 export async function register(req, res) {
   try {
     const { username, password, email } = req.body;
 
-    if (!username || !password)
+    if (!username || !password) {
       return res.status(400).json({ error: "Username and password required" });
+    }
 
     const exists = await prisma.user.findUnique({ where: { username } });
-    if (exists)
+    if (exists) {
       return res.status(409).json({ error: "Username already exists" });
+    }
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-
     const user = await prisma.user.create({
       data: { username, passwordHash, email },
     });
 
     const token = generateToken(user);
-    res.cookie("token", token, cookieOptions);
 
     return res.json({
       message: "Registration successful",
+      token,
       user: { id: user.id, username: user.username, role: user.role },
     });
   } catch (err) {
@@ -76,36 +48,29 @@ export async function register(req, res) {
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                      LOGIN                                  */
-/* -------------------------------------------------------------------------- */
-
+/* LOGIN */
 export async function login(req, res) {
   try {
     const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: "Username and password required" });
+    }
 
     const user = await prisma.user.findUnique({
       where: { username },
-      select: {
-        id: true,
-        username: true,
-        role: true,
-        passwordHash: true,
-      },
+      select: { id: true, username: true, role: true, passwordHash: true },
     });
 
-    if (!user)
-      return res.status(401).json({ error: "Invalid credentials" });
+    if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
     const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid)
-      return res.status(401).json({ error: "Invalid credentials" });
+    if (!valid) return res.status(401).json({ error: "Invalid credentials" });
 
     const token = generateToken(user);
-    res.cookie("token", token, cookieOptions);
 
     return res.json({
       message: "Login successful",
+      token,
       user: { id: user.id, username: user.username, role: user.role },
     });
   } catch (err) {
@@ -114,48 +79,34 @@ export async function login(req, res) {
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                      LOGOUT                                 */
-/* -------------------------------------------------------------------------- */
-
+/* LOGOUT - stateless: frontend should remove token locally */
 export function logout(req, res) {
-  res.clearCookie("token", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-  });
-
-  return res.json({ message: "Logged out successfully" });
+  try {
+    res.clearCookie("token");
+  } catch (e) {}
+  return res.json({ message: "Logged out (client should discard token)" });
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                      ME                                     */
-/* -------------------------------------------------------------------------- */
-
+/* ME - uses authenticate middleware (req.user) */
 export async function me(req, res) {
   try {
-    const token = req.cookies?.token;
-    if (!token)
+    if (!req.user?.id) {
       return res.status(401).json({ error: "Not authenticated" });
-
-    const decoded = jwt.verify(token, JWT_SECRET);
+    }
 
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+      where: { id: req.user.id },
       select: {
         id: true,
         username: true,
         email: true,
         role: true,
         createdAt: true,
-        team: {
-          select: { id: true, name: true, bannedUntil: true },
-        },
+        team: { select: { id: true, name: true, bannedUntil: true } },
       },
     });
 
-    if (!user)
-      return res.status(404).json({ error: "User not found" });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     return res.json({
       user: {
@@ -171,12 +122,7 @@ export async function me(req, res) {
     });
   } catch (err) {
     console.error("Auth /me error:", err);
-
-    if (err.name === "TokenExpiredError") {
-      return res.status(401).json({ error: "Session expired" });
-    }
-
-    return res.status(401).json({ error: "Invalid or expired token" });
+    return res.status(500).json({ error: "Server error" });
   }
 }
 

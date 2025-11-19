@@ -1,39 +1,47 @@
 /**
- * Admin Controller (ESM, Optimized, Secure)
- * -----------------------------------------
- * Handles:
- *  - Challenge CRUD
- *  - Challenge release toggle
- *  - Team listing (deduped solves, scoring)
- *  - Team bans & penalties
+ * Admin Controller (ESM + Hardened + Secure + JWT Bearer Compatible)
  */
 
 import fs from "fs";
 import prisma from "../config/db.js";
 import hashFlag from "../utils/hashFlag.js";
-import { broadcast } from "../lib/ws/ws.js"; 
+import { broadcast } from "../lib/ws/ws.js";
 
-// helper for creating announcement rows + broadcast (keeps code DRY)
+// Announcements helper
 async function sendAnnouncement({ title, message }) {
   try {
     const ann = await prisma.announcement.create({
       data: { title, message },
     });
 
-    // Broadcast minimal payload to clients (don't leak DB internals)
-    broadcast({
-      type: "announcement",
-      id: ann.id,
-      title: ann.title,
-      message: ann.message,
-      createdAt: ann.createdAt,
-    });
+    try {
+      broadcast({
+        type: "announcement",
+        id: ann.id,
+        title: ann.title,
+        message: ann.message,
+        createdAt: ann.createdAt,
+      });
+    } catch (wsError) {
+      console.error("WS Broadcast failed:", wsError);
+    }
 
     return ann;
   } catch (err) {
-    console.error("Announcement create/broadcast failed:", err);
-    // do not throw — announcement failure shouldn't block main admin action
+    console.error("Announcement DB error:", err);
     return null;
+  }
+}
+
+/* ========================================================================== */
+/*                               ADMIN CHECK                                    */
+/* ========================================================================== */
+
+function assertAdmin(req) {
+  if (!req.user || req.user.role !== "admin") {
+    const error = new Error("Admin only");
+    error.status = 403;
+    throw error;
   }
 }
 
@@ -43,6 +51,8 @@ async function sendAnnouncement({ title, message }) {
 
 export async function createChallenge(req, res) {
   try {
+    assertAdmin(req);
+
     const {
       name,
       category,
@@ -56,7 +66,8 @@ export async function createChallenge(req, res) {
 
     const filePath = req.file?.path ?? null;
 
-    const hasContainer = Boolean(imageName?.trim());
+    const sanitizedImageName = imageName ? imageName.trim().replace(/[^\w-.]/g, "") : null;
+    const hasContainer = Boolean(sanitizedImageName);
 
     const challengeData = {
       name,
@@ -65,26 +76,25 @@ export async function createChallenge(req, res) {
       description,
       filePath,
       points: Number(points),
-      released: released === "true",
+      released: released === "true" || released === true,
       flagHash: flag ? hashFlag(flag) : null,
       hasContainer,
-      imageName: hasContainer ? imageName.trim() : null
+      imageName: hasContainer ? sanitizedImageName : null
     };
 
     const challenge = await prisma.challenge.create({ data: challengeData });
 
     return res.json({ ok: true, challenge });
-
   } catch (err) {
     console.error("Create challenge error:", err);
 
     if (err.code === "P2002") {
-      return res.status(400).json({
-        error: "A challenge with this name already exists."
-      });
+      return res.status(400).json({ error: "A challenge with this name already exists." });
     }
 
-    return res.status(500).json({ error: "Failed to create challenge" });
+    return res.status(err.status || 500).json({
+      error: err.status === 403 ? "Admin only" : "Failed to create challenge"
+    });
   }
 }
 
@@ -94,7 +104,13 @@ export async function createChallenge(req, res) {
 
 export async function updateChallenge(req, res) {
   try {
+    assertAdmin(req);
+
     const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid challenge ID" });
+
+    const existing = await prisma.challenge.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: "Challenge not found" });
 
     const {
       name,
@@ -124,7 +140,9 @@ export async function updateChallenge(req, res) {
     return res.json({ ok: true, challenge });
   } catch (err) {
     console.error("Update challenge error:", err);
-    return res.status(500).json({ error: "Failed to update challenge" });
+    return res.status(err.status || 500).json({
+      error: err.status === 403 ? "Admin only" : "Failed to update challenge"
+    });
   }
 }
 
@@ -134,18 +152,24 @@ export async function updateChallenge(req, res) {
 
 export async function deleteChallenge(req, res) {
   try {
+    assertAdmin(req);
+
     const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid challenge ID" });
 
     const challenge = await prisma.challenge.findUnique({
       where: { id },
       select: { filePath: true }
     });
 
-    if (!challenge)
-      return res.status(404).json({ error: "Challenge not found" });
+    if (!challenge) return res.status(404).json({ error: "Challenge not found" });
 
     if (challenge.filePath && fs.existsSync(challenge.filePath)) {
-      fs.unlink(challenge.filePath, () => {});
+      try {
+        await fs.promises.unlink(challenge.filePath);
+      } catch (e) {
+        console.error("File delete error:", e);
+      }
     }
 
     await prisma.challenge.delete({ where: { id } });
@@ -153,7 +177,9 @@ export async function deleteChallenge(req, res) {
     return res.json({ ok: true });
   } catch (err) {
     console.error("Delete challenge error:", err);
-    return res.status(500).json({ error: "Failed to delete challenge" });
+    return res.status(err.status || 500).json({
+      error: err.status === 403 ? "Admin only" : "Failed to delete challenge"
+    });
   }
 }
 
@@ -163,6 +189,8 @@ export async function deleteChallenge(req, res) {
 
 export async function getAllChallenges(req, res) {
   try {
+    assertAdmin(req);
+
     const challenges = await prisma.challenge.findMany({
       select: {
         id: true,
@@ -181,77 +209,84 @@ export async function getAllChallenges(req, res) {
     return res.json(challenges);
   } catch (err) {
     console.error("Fetch challenges error:", err);
-    return res.status(500).json({ error: "Failed to fetch challenges" });
+    return res.status(err.status || 500).json({
+      error: err.status === 403 ? "Admin only" : "Failed to fetch challenges"
+    });
   }
 }
 
 /* ========================================================================== */
-/*                        TOGGLE CHALLENGE RELEASE                             */
+/*                          TOGGLE CHALLENGE RELEASE                           */
 /* ========================================================================== */
 
 export async function toggleRelease(req, res) {
   try {
+    assertAdmin(req);
+
     const id = Number(req.params.id);
-    // expecting { released: true/false } in body
-    const { released } = req.body;
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid challenge ID" });
+
+    const released = req.body.released === true || req.body.released === "true";
 
     const challenge = await prisma.challenge.update({
       where: { id },
       data: { released },
     });
 
-    // Friendly public announcement message
     const msg = released
       ? `Challenge "${challenge.name}" is now released — good luck!`
       : `Challenge "${challenge.name}" has been hidden by the admins.`;
 
     sendAnnouncement({
-      title: `Challenge ${released ? "released" : "hidden"}`,
+      title: `Challenge ${released ? "Released" : "Hidden"}`,
       message: msg,
     });
 
     return res.json({ ok: true, challenge });
   } catch (err) {
-    console.error("Error toggling challenge release:", err);
-    return res.status(500).json({ error: "Failed to toggle release status" });
+    console.error("Toggle release error:", err);
+    return res.status(err.status || 500).json({
+      error: err.status === 403 ? "Admin only" : "Failed to toggle release"
+    });
   }
 }
 
 /* ========================================================================== */
-/*                                 LIST TEAMS                                  */
+/*                                LIST TEAMS                                  */
 /* ========================================================================== */
 
 export async function getAllTeams(req, res) {
   try {
+    assertAdmin(req);
+
     const teams = await prisma.team.findMany({
       orderBy: { createdAt: "desc" },
       include: {
         members: {
-          select: {
-            id: true,
-            username: true,
+          include: {
             solved: {
               include: { challenge: true }
             }
           }
+        },
+        solved: {
+          include: { challenge: true }
         }
       }
     });
 
-    // Ultra-fast dedupe + scoring
     const formatted = teams.map(team => {
-      const unique = new Map();
+      const merge = [...team.solved, ...team.members.flatMap(m => m.solved)];
 
-      for (const member of team.members) {
-        for (const s of member.solved) {
-          if (!unique.has(s.challengeId)) {
-            unique.set(s.challengeId, s);
-          }
+      // Unique solves by challenge
+      const unique = new Map();
+      for (const s of merge) {
+        if (!unique.has(s.challengeId)) {
+          unique.set(s.challengeId, s);
         }
       }
 
       const uniqueSolves = [...unique.values()];
-
       const rawScore = uniqueSolves.reduce(
         (sum, s) => sum + (s.challenge?.points ?? 0),
         0
@@ -265,12 +300,7 @@ export async function getAllTeams(req, res) {
         name: team.name,
         createdAt: team.createdAt,
         bannedUntil: team.bannedUntil,
-
-        members: team.members.map(m => ({
-          id: m.id,
-          username: m.username
-        })),
-
+        members: team.members.map(m => ({ id: m.id, username: m.username })),
         solvedCount: uniqueSolves.length,
         rawScore,
         totalScore,
@@ -281,7 +311,9 @@ export async function getAllTeams(req, res) {
     return res.json(formatted);
   } catch (err) {
     console.error("Fetch teams error:", err);
-    return res.status(500).json({ error: "Failed to fetch teams" });
+    return res.status(err.status || 500).json({
+      error: err.status === 403 ? "Admin only" : "Failed to fetch teams"
+    });
   }
 }
 
@@ -291,16 +323,17 @@ export async function getAllTeams(req, res) {
 
 export async function banTeam(req, res) {
   try {
+    assertAdmin(req);
+
     const { id } = req.params;
     const { durationMinutes } = req.body;
 
     let bannedUntil;
 
     if (Number(durationMinutes) === 0) {
-      // Permanent ban → store far-future date
       bannedUntil = new Date("9999-12-31T23:59:59Z");
     } else if (Number(durationMinutes) > 0) {
-      bannedUntil = new Date(Date.now() + Number(durationMinutes) * 60 * 1000);
+      bannedUntil = new Date(Date.now() + Number(durationMinutes) * 60000);
     } else {
       return res.status(400).json({ error: "Invalid ban duration" });
     }
@@ -313,25 +346,23 @@ export async function banTeam(req, res) {
 
     const msg =
       Number(durationMinutes) === 0
-        ? `Team "${team.name}" has been permanently banned by administrators.`
-        : `Team "${team.name}" has been suspended for ${durationMinutes} minute(s).`;
+        ? `Team "${team.name}" has been permanently banned.`
+        : `Team "${team.name}" has been banned for ${durationMinutes} minute(s).`;
 
-    // send announcement asynchronously (non-blocking)
     sendAnnouncement({
-      title: `Team ${Number(durationMinutes) === 0 ? "banned" : "suspended"}`,
+      title: "Team Ban",
       message: msg,
     });
 
     return res.json({
       ok: true,
-      message:
-        Number(durationMinutes) === 0
-          ? "Team permanently banned"
-          : `Team banned for ${durationMinutes} minutes`,
+      message: msg,
     });
   } catch (err) {
-    console.error("Error banning team:", err);
-    return res.status(500).json({ error: "Failed to ban team" });
+    console.error("Ban team error:", err);
+    return res.status(err.status || 500).json({
+      error: err.status === 403 ? "Admin only" : "Failed to ban team"
+    });
   }
 }
 
@@ -341,18 +372,19 @@ export async function banTeam(req, res) {
 
 export async function unbanTeam(req, res) {
   try {
-    const { id } = req.params;
+    assertAdmin(req);
+
+    const id = Number(req.params.id);
 
     const team = await prisma.team.update({
-      where: { id: Number(id) },
+      where: { id },
       data: { bannedUntil: null },
       include: { members: true },
     });
 
-    // announce
     sendAnnouncement({
-      title: "Team unbanned",
-      message: `Team "${team.name}" has been unbanned and can participate again.`,
+      title: "Team Unbanned",
+      message: `Team "${team.name}" is now unbanned and can continue competing.`,
     });
 
     return res.json({
@@ -360,11 +392,12 @@ export async function unbanTeam(req, res) {
       message: "Team unbanned successfully",
     });
   } catch (err) {
-    console.error("Error unbanning team:", err);
-    return res.status(500).json({ error: "Failed to unban team" });
+    console.error("Unban team error:", err);
+    return res.status(err.status || 500).json({
+      error: err.status === 403 ? "Admin only" : "Failed to unban team"
+    });
   }
 }
-
 
 /* ========================================================================== */
 /*                               APPLY PENALTY                                 */
@@ -372,11 +405,14 @@ export async function unbanTeam(req, res) {
 
 export async function reduceTeamScore(req, res) {
   try {
+    assertAdmin(req);
+
     const id = Number(req.params.id);
     const penalty = Number(req.body.penalty);
 
-    if (Number.isNaN(penalty))
+    if (Number.isNaN(penalty)) {
       return res.status(400).json({ error: "Invalid penalty" });
+    }
 
     const team = await prisma.team.findUnique({
       where: { id },
@@ -385,8 +421,7 @@ export async function reduceTeamScore(req, res) {
       }
     });
 
-    if (!team)
-      return res.status(404).json({ error: "Team not found" });
+    if (!team) return res.status(404).json({ error: "Team not found" });
 
     const rawScore = team.solved.reduce(
       (sum, s) => sum + (s.challenge?.points ?? 0),
@@ -409,7 +444,9 @@ export async function reduceTeamScore(req, res) {
     });
   } catch (err) {
     console.error("Penalty error:", err);
-    return res.status(500).json({ error: "Failed to apply penalty" });
+    return res.status(err.status || 500).json({
+      error: err.status === 403 ? "Admin only" : "Failed to apply penalty"
+    });
   }
 }
 
