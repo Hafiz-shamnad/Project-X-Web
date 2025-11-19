@@ -12,9 +12,19 @@ export default function DashboardPageClient() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // ❗ Prevent SSR (localStorage does NOT exist on server)
+    if (typeof window === "undefined") return;
+
     let cancelled = false;
 
     async function checkAuth() {
+      // ❗ Ensure token exists BEFORE making /auth/me request
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.replace("/login");
+        return;
+      }
+
       try {
         const res = await apiFetch("/auth/me");
 
@@ -25,7 +35,7 @@ export default function DashboardPageClient() {
             router.replace("/login");
           }
         }
-      } catch {
+      } catch (err) {
         router.replace("/login");
       } finally {
         if (!cancelled) setLoading(false);
@@ -33,7 +43,9 @@ export default function DashboardPageClient() {
     }
 
     checkAuth();
-    return () => { cancelled = true };
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   if (loading) return <LoadingScreen />;
