@@ -33,9 +33,12 @@ function timeAgo(dateString: string) {
 function classify(title: string) {
   const t = title.toLowerCase();
 
-  if (t.includes("ban")) return { icon: "⛔", color: "border-red-500 bg-red-500/20" };
-  if (t.includes("release")) return { icon: "🚀", color: "border-green-500 bg-green-500/20" };
-  if (t.includes("challenge")) return { icon: "🏁", color: "border-yellow-400 bg-yellow-500/20" };
+  if (t.includes("ban"))
+    return { icon: "⛔", color: "border-red-500 bg-red-500/20" };
+  if (t.includes("release"))
+    return { icon: "🚀", color: "border-green-500 bg-green-500/20" };
+  if (t.includes("challenge"))
+    return { icon: "🏁", color: "border-yellow-400 bg-yellow-500/20" };
 
   return { icon: "⚡", color: "border-blue-400 bg-blue-500/20" };
 }
@@ -99,6 +102,8 @@ export default function AnnouncementPanel({
 
   /* WS TOAST LISTENER */
   useEffect(() => {
+    if (!BACKEND_URL) return;
+
     const wsURL = BACKEND_URL.replace("http", "ws").replace("/api", "");
     const ws = new WebSocket(`${wsURL}/ws`);
 
