@@ -1,69 +1,65 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { apiFetch } from "@/app/lib/api";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiClient } from "../lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const [form, setForm] = useState({ username: "", password: "" });
-  const [status, setStatus] = useState({ loading: false, error: "" });
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
-  const handleChange = useCallback((e: any) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  }, []);
+    try {
+      const res = await apiClient("/auth/login", {
+        method: "POST",
+        json: { username, password },
+      });
 
-  const handleLogin = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      setStatus({ loading: true, error: "" });
+      localStorage.setItem("token", res.token);
+      localStorage.setItem("user", JSON.stringify(res.user));
 
-      try {
-        const data = await apiFetch("/auth/login", {
-          method: "POST",
-          json: form,
-        });
-
-        // SAVE TOKEN
-        localStorage.setItem("token", data.token);
-
-        router.push(data.user.role === "admin" ? "/admin" : "/dashboard");
-      } catch (err: any) {
-        setStatus({
-          loading: false,
-          error: err.message || "Login failed",
-        });
-      }
-    },
-    [form, router]
-  );
+      router.push("/admin");
+    } catch (err: any) {
+      setError(err.message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <form onSubmit={handleLogin} className="bg-gray-900 p-6 rounded-lg">
+    <div className="min-h-screen flex items-center justify-center bg-black">
+      <form onSubmit={handleSubmit} className="bg-zinc-900 p-8 rounded w-full max-w-sm">
+        <h1 className="text-white text-xl font-semibold mb-4">Admin Login</h1>
+
+        {error && <div className="text-red-400 text-sm">{error}</div>}
+
         <input
-          name="username"
+          className="bg-zinc-800 text-white rounded p-2 w-full mt-3"
           placeholder="Username"
-          onChange={handleChange}
-          className="block w-full p-2 mb-3"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
         />
+
         <input
-          name="password"
+          className="bg-zinc-800 text-white rounded p-2 w-full mt-3"
           type="password"
           placeholder="Password"
-          onChange={handleChange}
-          className="block w-full p-2 mb-3"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
         />
 
-        {status.error && <p className="text-red-400">{status.error}</p>}
-
         <button
-          type="submit"
-          disabled={status.loading}
-          className="bg-blue-600 px-4 py-2 rounded"
+          disabled={loading}
+          className="bg-blue-600 hover:bg-blue-700 text-white rounded p-2 w-full mt-4"
         >
-          {status.loading ? "Logging in..." : "Login"}
+          {loading ? "Logging in..." : "Login"}
         </button>
       </form>
     </div>
