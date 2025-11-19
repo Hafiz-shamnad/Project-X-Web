@@ -12,13 +12,13 @@ export default function DashboardPageClient() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // ❗ Prevent SSR (localStorage does NOT exist on server)
+    // ❗ block SSR
     if (typeof window === "undefined") return;
 
     let cancelled = false;
 
     async function checkAuth() {
-      // ❗ Ensure token exists BEFORE making /auth/me request
+      // ❗ Ensure token exists before sending /auth/me
       const token = localStorage.getItem("token");
       if (!token) {
         router.replace("/login");
@@ -35,14 +35,16 @@ export default function DashboardPageClient() {
             router.replace("/login");
           }
         }
-      } catch (err) {
+      } catch {
         router.replace("/login");
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-    checkAuth();
+    // Delay to ensure hydration completed (fixes early null localStorage)
+    setTimeout(checkAuth, 0);
+
     return () => {
       cancelled = true;
     };
