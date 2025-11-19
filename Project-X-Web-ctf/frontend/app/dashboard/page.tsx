@@ -1,9 +1,5 @@
-// SERVER COMPONENT
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+import DashboardClient from "./DashboardPageClient";
 
-import DashboardPageClient from "./DashboardPageClient";
-
-export default function DashboardPage() {
-  return <DashboardPageClient />;
+export default function Page() {
+  return <DashboardClient />;
 }

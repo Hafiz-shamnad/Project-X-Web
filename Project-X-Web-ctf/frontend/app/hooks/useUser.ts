@@ -29,6 +29,8 @@ export function useUser() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     let cancelled = false;
 
     const token =
