@@ -12,21 +12,13 @@ export default function DashboardPageClient() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-<<<<<<< HEAD
     // ❗ block SSR
-=======
-    // ❗ Prevent SSR (localStorage does NOT exist on server)
->>>>>>> f82ae639a93256d5d58f1601fd97f5076c662ae4
     if (typeof window === "undefined") return;
 
     let cancelled = false;
 
     async function checkAuth() {
-<<<<<<< HEAD
       // ❗ Ensure token exists before sending /auth/me
-=======
-      // ❗ Ensure token exists BEFORE making /auth/me request
->>>>>>> f82ae639a93256d5d58f1601fd97f5076c662ae4
       const token = localStorage.getItem("token");
       if (!token) {
         router.replace("/login");
@@ -43,20 +35,16 @@ export default function DashboardPageClient() {
             router.replace("/login");
           }
         }
-      } catch (err) {
+      } catch {
         router.replace("/login");
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-<<<<<<< HEAD
     // Delay to ensure hydration completed (fixes early null localStorage)
     setTimeout(checkAuth, 0);
 
-=======
-    checkAuth();
->>>>>>> f82ae639a93256d5d58f1601fd97f5076c662ae4
     return () => {
       cancelled = true;
     };
