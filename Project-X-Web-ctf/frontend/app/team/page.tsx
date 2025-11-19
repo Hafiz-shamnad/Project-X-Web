@@ -12,7 +12,7 @@ import {
   Sparkles,
   Shield,
 } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/app/lib/api";
 import TeamInsights from "../components/TeamInsights";
 import type { Member } from "../components/TeamInsights";
 

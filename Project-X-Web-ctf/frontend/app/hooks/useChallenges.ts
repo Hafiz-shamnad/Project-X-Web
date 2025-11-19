@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { apiFetch } from "../lib/api";
 import type { Challenge } from "../types/Challenge";
-
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL;
 
 interface UseChallengesParams {
   teamId: number | null;
@@ -15,7 +13,6 @@ export function useChallenges({ teamId }: UseChallengesParams) {
   const [solvedIds, setSolvedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Avoid setting state after unmount → fastest safe pattern
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -24,17 +21,13 @@ export function useChallenges({ teamId }: UseChallengesParams) {
     };
   }, []);
 
-  /** ------------------------------
+  /* ----------------------------------------
    * Fetch Challenges (released only)
-   * ------------------------------ */
+   * ---------------------------------------- */
   const fetchChallenges = useCallback(async () => {
     try {
-      const res = await fetch(`${BACKEND_URL}/challenges`, {
-        credentials: "include",
-      });
-      if (!res.ok) return [];
+      const data = await apiFetch<Challenge[]>("/challenges");
 
-      const data: Challenge[] = await res.json();
       return data.filter((c) => c.released);
     } catch (err) {
       console.error("Error loading challenges:", err);
@@ -42,34 +35,29 @@ export function useChallenges({ teamId }: UseChallengesParams) {
     }
   }, []);
 
-  /** ------------------------------
+  /* ----------------------------------------
    * Fetch Team Solves
-   * ------------------------------ */
+   * ---------------------------------------- */
   const fetchSolves = useCallback(async () => {
     if (!teamId) return [];
 
     try {
-      const res = await fetch(`${BACKEND_URL}/team/${teamId}/solves`, {
-        credentials: "include",
-      });
-      if (!res.ok) return [];
+      const solvedResponse = await apiFetch(`/team/${teamId}/solves`);
 
-      const solvedData = await res.json();
       return (
-        solvedData?.solved?.map(
+        solvedResponse?.solved?.map(
           (s: { challengeId: number }) => s.challengeId
         ) ?? []
       );
     } catch (err) {
-      console.error("Error loading solved challenges:", err);
+      console.error("Error loading solves:", err);
       return [];
     }
   }, [teamId]);
 
-  /** ------------------------------
-   * Initial + dependency refresh
-   * MOST OPTIMIZED LOADING
-   * ------------------------------ */
+  /* ----------------------------------------
+   * Initial load + sync on dependency updates
+   * ---------------------------------------- */
   useEffect(() => {
     let cancelled = false;
 
@@ -81,12 +69,11 @@ export function useChallenges({ teamId }: UseChallengesParams) {
         fetchSolves(),
       ]);
 
-      if (cancelled || !mounted.current) return;
-
-      // Single atomic state update → minimal UI rerenders
-      setChallenges(challs);
-      setSolvedIds(solves);
-      setLoading(false);
+      if (!cancelled && mounted.current) {
+        setChallenges(challs);
+        setSolvedIds(solves);
+        setLoading(false);
+      }
     })();
 
     return () => {
@@ -94,17 +81,17 @@ export function useChallenges({ teamId }: UseChallengesParams) {
     };
   }, [fetchChallenges, fetchSolves]);
 
-  /** ------------------------------
+  /* ----------------------------------------
    * Manual Refresh
-   * Most efficient version
-   * ------------------------------ */
+   * ---------------------------------------- */
   const refresh = useCallback(async () => {
     setLoading(true);
     const [c, s] = await Promise.all([fetchChallenges(), fetchSolves()]);
-    if (!mounted.current) return;
-    setChallenges(c);
-    setSolvedIds(s);
-    setLoading(false);
+    if (mounted.current) {
+      setChallenges(c);
+      setSolvedIds(s);
+      setLoading(false);
+    }
   }, [fetchChallenges, fetchSolves]);
 
   return { challenges, solvedIds, loading, refresh };

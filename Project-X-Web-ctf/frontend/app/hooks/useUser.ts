@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "../lib/api";
 
 export interface UserProfile {
   username: string;
@@ -14,9 +15,6 @@ interface UserState {
   isTempBanned: boolean;
   isPermanentBanned: boolean;
 }
-
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL;
 
 export function useUser() {
   const [state, setState] = useState<UserState>({
@@ -33,12 +31,9 @@ export function useUser() {
 
     (async () => {
       try {
-        const res = await fetch(`${BACKEND_URL}/auth/me`, {
-          credentials: "include",
-        });
-        const data = await res.json();
+        const data = await apiFetch("/auth/me");
 
-        if (!data.user?.username) {
+        if (!data?.user?.username) {
           if (!cancelled) setLoading(false);
           return;
         }
@@ -67,7 +62,7 @@ export function useUser() {
           });
         }
       } catch (err) {
-        console.error("Error fetching user:", err);
+        console.error("useUser /auth/me failed:", err);
       } finally {
         if (!cancelled) setLoading(false);
       }

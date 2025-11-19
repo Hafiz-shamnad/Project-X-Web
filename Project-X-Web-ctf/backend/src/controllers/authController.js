@@ -34,10 +34,13 @@ function generateToken(user) {
 
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
-  maxAge: 7 * 86400 * 1000, // 7 days
+  secure: process.env.NODE_ENV === "production", // true on vercel
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  partitioned: true, 
+  path: "/",
+  maxAge: 7 * 86400 * 1000,
 };
+
 
 /* -------------------------------------------------------------------------- */
 /*                                    REGISTER                                 */
