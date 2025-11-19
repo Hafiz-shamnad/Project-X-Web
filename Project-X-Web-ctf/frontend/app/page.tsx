@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
  * - Works entirely on the client to avoid Next.js caching issues
  */
 export default function Home() {
+  
   const router = useRouter();
 
   useEffect(() => {

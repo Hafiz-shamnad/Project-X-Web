@@ -1,67 +1,38 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiClient } from "../lib/api";
+import { useState, useEffect } from "react";
+import { apiFetch } from "../lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleLogin = async (e: any) => {
     e.preventDefault();
-    setError("");
-    setLoading(true);
+    console.log("LOGIN PAYLOAD:", { username, password });
 
-    try {
-      const res = await apiClient("/auth/login", {
-        method: "POST",
-        json: { username, password },
-      });
+    const data = await apiFetch("/auth/login", {
+      method: "POST",
+      auth: false,
+      json: { username, password },
+    });
 
-      localStorage.setItem("token", res.token);
-      localStorage.setItem("user", JSON.stringify(res.user));
+    console.log("LOGIN SUCCESS TOKEN:", data.token);
 
-      router.push("/admin");
-    } catch (err: any) {
-      setError(err.message || "Login failed");
-    } finally {
-      setLoading(false);
-    }
-  }
+    localStorage.setItem("token", data.token);
+
+    console.log("REDIRECTING TO /dashboard ...");
+    router.replace("/dashboard");
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black">
-      <form onSubmit={handleSubmit} className="bg-zinc-900 p-8 rounded w-full max-w-sm">
-        <h1 className="text-white text-xl font-semibold mb-4">Admin Login</h1>
-
-        {error && <div className="text-red-400 text-sm">{error}</div>}
-
-        <input
-          className="bg-zinc-800 text-white rounded p-2 w-full mt-3"
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-
-        <input
-          className="bg-zinc-800 text-white rounded p-2 w-full mt-3"
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-
-        <button
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded p-2 w-full mt-4"
-        >
-          {loading ? "Logging in..." : "Login"}
-        </button>
-      </form>
-    </div>
+    <form onSubmit={handleLogin}>
+      <input value={username} onChange={e => setUsername(e.target.value)} />
+      <input value={password} onChange={e => setPassword(e.target.value)} type="password" />
+      <button>Login</button>
+    </form>
   );
 }
