@@ -47,7 +47,8 @@ export default function LoginPage() {
       } catch (err: any) {
         setStatus({
           loading: false,
-          error: err?.message || "Unexpected server error. Please try again.",
+          error:
+            err?.message || "Unexpected server error. Please try again.",
         });
       }
     },
