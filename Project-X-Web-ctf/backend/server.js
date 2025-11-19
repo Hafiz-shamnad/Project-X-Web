@@ -46,7 +46,7 @@ const server = http.createServer(app);
 // FRONTEND + BACKEND CONFIG
 // ----------------------------------------------------------------------------
 
-const FRONTEND = "https://project-x-web-git-main-hafiz-shds-projects.vercel.app";
+const FRONTEND = "https://project-x-web-ten.vercel.app";
 const BACKEND_DOMAIN = "project-x-backend-production-0313.up.railway.app";
 
 console.log("🌐 FRONTEND:", FRONTEND);
