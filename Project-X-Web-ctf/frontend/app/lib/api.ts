@@ -1,17 +1,16 @@
 /**
  * API Client (JWT Bearer + JSON + File Upload + Production Ready)
  */
-// TOP OF api.ts
 
+// Load token safely (browser only)
 function getToken() {
   if (typeof window === "undefined") return null;
   try {
-    return window.localStorage.getItem("token");
+    return localStorage.getItem("token");
   } catch {
     return null;
   }
 }
-
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -19,9 +18,9 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL;
  * Types
  * ---------------------------------------------- */
 interface ApiOptions extends RequestInit {
-  auth?: boolean;        // attach Authorization Bearer token (default: true)
-  json?: any;            // JSON body
-  form?: FormData;       // FormData upload
+  auth?: boolean;  // attach Authorization Bearer token (default: true)
+  json?: any;      // JSON body
+  form?: FormData; // FormData upload
 }
 
 /* ----------------------------------------------
@@ -31,55 +30,33 @@ export async function apiFetch<T = any>(
   endpoint: string,
   options: ApiOptions = {}
 ): Promise<T> {
+
   if (!API_URL) {
     throw new Error("API_URL is missing. Set NEXT_PUBLIC_API_URL in .env");
   }
 
   const url = `${API_URL}${endpoint}`;
-
-  // Load token only in browser
   const token = getToken();
-
 
   /* ----------------------------------------------
    * Construct Headers
    * ---------------------------------------------- */
-
-  /* ----------------------------------------------
- * Normalize Headers Safely
- * ---------------------------------------------- */
-  const normalizedHeaders: Record<string, string> = {
+  const headers: Record<string, string> = {
     Accept: "application/json",
   };
 
-  // Convert incoming headers → simple string map
+  // Apply incoming headers
   if (options.headers instanceof Headers) {
     options.headers.forEach((value, key) => {
-      normalizedHeaders[key] = value;
+      headers[key] = value;
     });
   } else if (options.headers && typeof options.headers === "object") {
     for (const [key, value] of Object.entries(options.headers)) {
-      if (typeof value === "string") {
-        normalizedHeaders[key] = value;
-      }
+      if (typeof value === "string") headers[key] = value;
     }
   }
 
-  // Attach Bearer Token
-  if (options.auth !== false && token) {
-    normalizedHeaders["Authorization"] = `Bearer ${token}`;
-  }
-
-  // JSON Body
-  if (options.json) {
-    normalizedHeaders["Content-Type"] = "application/json";
-  }
-
-  // Final headers object
-  const headers = normalizedHeaders;
-
-
-  // Add Bearer Token unless explicitly disabled
+  // Attach Bearer Token (once only)
   if (options.auth !== false && token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
@@ -99,20 +76,22 @@ export async function apiFetch<T = any>(
    * ---------------------------------------------- */
   if (options.form) {
     body = options.form;
-    // DO NOT manually set Content-Type for FormData
+    // IMPORTANT: Do NOT set Content-Type manually for FormData
   }
 
   /* ----------------------------------------------
-   * Final fetch request
+   * Final Request Options
    * ---------------------------------------------- */
   const req: RequestInit = {
     method: options.method || "GET",
-    credentials: "include",
     mode: "cors",
     headers,
     body,
   };
 
+  /* ----------------------------------------------
+   * Execute Request
+   * ---------------------------------------------- */
   let res: Response;
 
   try {
@@ -123,7 +102,7 @@ export async function apiFetch<T = any>(
     );
   }
 
-  // Handle No Content responses
+  // No Content Responses
   if (res.status === 204) return null as T;
 
   let data: any;
@@ -135,7 +114,7 @@ export async function apiFetch<T = any>(
   }
 
   /* ----------------------------------------------
-   * Automatic 401 Logout
+   * Automatic 401 Handling
    * ---------------------------------------------- */
   if (res.status === 401) {
     if (typeof window !== "undefined") {
@@ -147,7 +126,7 @@ export async function apiFetch<T = any>(
   }
 
   /* ----------------------------------------------
-   * General Error Handling
+   * Error Handling
    * ---------------------------------------------- */
   if (!res.ok) {
     throw new Error(
@@ -163,5 +142,5 @@ export async function apiFetch<T = any>(
 /* ----------------------------------------------
  * Backward Compatibility Exports
  * ---------------------------------------------- */
-export const apiClient = apiFetch; // old name still works
-export const api = apiFetch;       // convenient alias
+export const apiClient = apiFetch;
+export const api = apiFetch;
