@@ -1,38 +1,60 @@
 /**
- * WebSocket Server (ESM + JWT Auth + Hardened)
+ * WebSocket Server (JWT Auth + Browser-safe + CLI-safe + CORS-safe)
  */
 
 import { WebSocketServer } from "ws";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 let wss = null;
 let clients = new Set();
+
+/**
+ * Extract JWT token from:
+ * 1) Authorization header (CLI/cURL)
+ * 2) ?token= in WebSocket URL (Browser)
+ */
+function extractToken(req) {
+  // 1) Authorization header
+  const auth = req.headers?.authorization;
+  if (auth && auth.startsWith("Bearer ")) {
+    return auth.split(" ")[1];
+  }
+
+  // 2) Query param: ws://host/ws?token=...
+  try {
+    const url = new URL(req.url, "http://localhost"); // base irrelevant
+    const t = url.searchParams.get("token");
+    if (t) return t;
+  } catch (_) {}
+
+  return null;
+}
 
 export function initWebSocketServer(server) {
   wss = new WebSocketServer({ noServer: true });
 
   server.on("upgrade", (req, socket, head) => {
-    if (req.url !== "/ws") {
+    // Only accept /ws
+    if (!req.url.startsWith("/ws")) {
+      socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
       socket.destroy();
       return;
     }
 
-    // --- JWT BEARER VALIDATION ---
+    // --- AUTH ---
+    const token = extractToken(req);
+
+    if (!token) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+
     try {
-      const auth = req.headers["authorization"];
-
-      if (!auth || !auth.startsWith("Bearer ")) {
-        socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
-        socket.destroy();
-        return;
-      }
-
-      const token = auth.split(" ")[1];
-
       const decoded = jwt.verify(token, JWT_SECRET);
-      req.user = decoded; // attach user to request
+      req.user = decoded;
     } catch (err) {
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
       socket.destroy();
@@ -45,6 +67,12 @@ export function initWebSocketServer(server) {
     });
   });
 
+  // Allow CORS on WebSocket handshake response
+  wss.on("headers", (headers, req) => {
+    headers.push("Access-Control-Allow-Origin: *");
+  });
+
+  // --- On Connection ---
   wss.on("connection", (ws, req) => {
     ws.user = req.user;
     clients.add(ws);
@@ -57,7 +85,7 @@ export function initWebSocketServer(server) {
     });
   });
 
-  console.log("🔌 WebSocket server initialized with JWT Auth");
+  console.log("🔌 WebSocket server initialized with JWT + Browser-safe auth");
   return wss;
 }
 
@@ -65,11 +93,11 @@ export function initWebSocketServer(server) {
  * Broadcast event to all connected clients
  */
 export function broadcast(event) {
-  const json = JSON.stringify(event);
+  const message = JSON.stringify(event);
 
   for (const ws of clients) {
     try {
-      ws.send(json);
+      ws.send(message);
     } catch (err) {
       console.error("WebSocket send failed:", err);
     }
