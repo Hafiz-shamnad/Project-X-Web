@@ -96,7 +96,7 @@ export async function apiFetch<T = any>(
    * ---------------------------------------------- */
   const req: RequestInit = {
     method: options.method || "GET",
-    credentials: "omit", // 🔥 NO COOKIES — Bearer Token only
+    credentials: "include",
     mode: "cors",
     headers,
     body,
