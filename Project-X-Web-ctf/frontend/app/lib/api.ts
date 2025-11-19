@@ -2,8 +2,12 @@
  * API Client (JWT Bearer + JSON + File Upload + Production Ready)
  */
 
-// Load token safely (browser only)
-function getToken() {
+export const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+/* ----------------------------------------------
+ * Token Helpers (Browser Safe)
+ * ---------------------------------------------- */
+function getToken(): string | null {
   if (typeof window === "undefined") return null;
   try {
     return localStorage.getItem("token");
@@ -12,19 +16,17 @@ function getToken() {
   }
 }
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 /* ----------------------------------------------
  * Types
  * ---------------------------------------------- */
 interface ApiOptions extends RequestInit {
-  auth?: boolean;  // attach Authorization Bearer token (default: true)
+  auth?: boolean;  // attach Authorization token (default: true)
   json?: any;      // JSON body
-  form?: FormData; // FormData upload
+  form?: FormData; // file upload
 }
 
 /* ----------------------------------------------
- * Main Fetch Function
+ * Main API Function
  * ---------------------------------------------- */
 export async function apiFetch<T = any>(
   endpoint: string,
@@ -32,35 +34,38 @@ export async function apiFetch<T = any>(
 ): Promise<T> {
 
   if (!API_URL) {
-    throw new Error("API_URL is missing. Set NEXT_PUBLIC_API_URL in .env");
+    throw new Error("❌ API_URL missing. Set NEXT_PUBLIC_API_URL in .env");
   }
 
   const url = `${API_URL}${endpoint}`;
   const token = getToken();
 
   /* ----------------------------------------------
-   * Construct Headers
+   * Build Headers
    * ---------------------------------------------- */
   const headers: Record<string, string> = {
     Accept: "application/json",
   };
 
-  // Apply incoming headers
+  // Copy custom headers
   if (options.headers instanceof Headers) {
-    options.headers.forEach((value, key) => {
-      headers[key] = value;
-    });
+    options.headers.forEach((v, k) => (headers[k] = v));
   } else if (options.headers && typeof options.headers === "object") {
-    for (const [key, value] of Object.entries(options.headers)) {
-      if (typeof value === "string") headers[key] = value;
+    for (const [k, v] of Object.entries(options.headers)) {
+      if (typeof v === "string") headers[k] = v;
     }
   }
 
-  // Attach Bearer Token (once only)
-  if (options.auth !== false && token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  /* ----------------------------------------------
+   * Attach Bearer Token (unless disabled)
+   * ---------------------------------------------- */
+  // Attach Bearer token
+  if (options.auth !== false) {
+    const token = getToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
   }
-
   let body: BodyInit | undefined;
 
   /* ----------------------------------------------
@@ -72,21 +77,23 @@ export async function apiFetch<T = any>(
   }
 
   /* ----------------------------------------------
-   * FormData Upload
+   * FormData Body
    * ---------------------------------------------- */
   if (options.form) {
     body = options.form;
-    // IMPORTANT: Do NOT set Content-Type manually for FormData
+    // IMPORTANT: Do NOT set Content-Type (browser sets it automatically)
+    delete headers["Content-Type"];
   }
 
   /* ----------------------------------------------
-   * Final Request Options
+   * Final Request
    * ---------------------------------------------- */
   const req: RequestInit = {
     method: options.method || "GET",
-    mode: "cors",
     headers,
     body,
+    credentials: "omit", // since you use pure Bearer token
+    mode: "cors",
   };
 
   /* ----------------------------------------------
@@ -96,25 +103,23 @@ export async function apiFetch<T = any>(
 
   try {
     res = await fetch(url, req);
-  } catch (err) {
-    throw new Error(
-      `Network unreachable: ${(err as Error)?.message || "Unknown error"}`
-    );
+  } catch (error: any) {
+    throw new Error(`🌐 Network error: ${error.message}`);
   }
 
-  // No Content Responses
+  // successful "no content"
   if (res.status === 204) return null as T;
 
+  // Parse JSON safely
   let data: any;
-
   try {
     data = await res.json();
   } catch {
-    throw new Error("Invalid JSON response from server.");
+    throw new Error("❌ Server returned invalid JSON.");
   }
 
   /* ----------------------------------------------
-   * Automatic 401 Handling
+   * Auto 401 Handling
    * ---------------------------------------------- */
   if (res.status === 401) {
     if (typeof window !== "undefined") {
@@ -122,11 +127,11 @@ export async function apiFetch<T = any>(
       localStorage.removeItem("user");
       window.location.href = "/login";
     }
-    throw new Error("Unauthorized — Login required");
+    throw new Error("Unauthorized");
   }
 
   /* ----------------------------------------------
-   * Error Handling
+   * Handle Errors
    * ---------------------------------------------- */
   if (!res.ok) {
     throw new Error(
@@ -139,8 +144,6 @@ export async function apiFetch<T = any>(
   return data as T;
 }
 
-/* ----------------------------------------------
- * Backward Compatibility Exports
- * ---------------------------------------------- */
-export const apiClient = apiFetch;
+/* Aliases */
 export const api = apiFetch;
+export const apiClient = apiFetch;

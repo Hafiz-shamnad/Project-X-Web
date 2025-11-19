@@ -33,19 +33,11 @@ export function useUser() {
 
     let cancelled = false;
 
-    const token =
-      typeof window !== "undefined"
-        ? localStorage.getItem("token")
-        : null;
-
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
     (async () => {
       try {
-        const data = await apiFetch("/auth/me", { auth: true });
+        // *** ALWAYS call /auth/me — token will be attached automatically ***
+        const data = await apiFetch("/auth/me");
+        console.log("ME RESPONSE:", data);
 
         if (!data?.user) {
           if (!cancelled) setLoading(false);
@@ -89,8 +81,5 @@ export function useUser() {
     };
   }, []);
 
-  return {
-    ...state,
-    loading,
-  };
+  return { ...state, loading };
 }

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Shield, Users, Lock, User, Menu, X, Trophy, Bell } from "lucide-react";
 import { useEffect, useState, useRef, useCallback } from "react";
 import LogoutButton from "./LogoutButton";
+import { apiFetch } from "../lib/api";
 import AnnouncementPanel from "./AnnouncementPanel";
 import { BACKEND_URL } from "../utils/constants";
 
@@ -84,16 +85,13 @@ export default function Navbar() {
 
     const loadUser = async () => {
       try {
-        const res = await fetch(`${BACKEND_URL}/auth/me`, {
-          credentials: "omit",
-        });
+        const data = await apiFetch("/auth/me"); // <-- USE API CLIENT
         if (!active) return;
-
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data.user);
-        }
-      } catch {}
+        setUser(data.user);
+      } catch (err) {
+        // 401 is already handled by apiFetch (redirects to login)
+        console.error("Auth load error:", err);
+      }
     };
 
     loadUser();

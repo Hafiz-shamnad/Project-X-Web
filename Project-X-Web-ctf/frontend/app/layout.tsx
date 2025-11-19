@@ -4,7 +4,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "./components/Navbar";
-
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "Project X - CTF Platform",
@@ -18,6 +18,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* React DevTools standalone */}
+        <Script
+          src="http://localhost:8097"
+          strategy="beforeInteractive"
+        />
+      </head>
+
       <body className="font-mono">
         <Navbar />
         {children}

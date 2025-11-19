@@ -46,8 +46,8 @@ const server = http.createServer(app);
 // FRONTEND + BACKEND CONFIG
 // ----------------------------------------------------------------------------
 
-const FRONTEND = "https://project-x-web-ten.vercel.app";
-const BACKEND_DOMAIN = "project-x-backend-production-0313.up.railway.app";
+const FRONTEND = "http://localhost:3000";
+const BACKEND_DOMAIN = "http://localhost:4000/api";
 
 console.log("🌐 FRONTEND:", FRONTEND);
 console.log("🌐 BACKEND DOMAIN:", BACKEND_DOMAIN);
