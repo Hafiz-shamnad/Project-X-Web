@@ -13,7 +13,7 @@ export default function LogoutButton({
 }: LogoutButtonProps) {
   // Memoize backend URL so it never triggers rerenders
   const apiUrl = useMemo(
-    () => backendURL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api",
+    () => backendURL || process.env.NEXT_PUBLIC_API_URL,
     [backendURL]
   );
 

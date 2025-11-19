@@ -1,7 +1,5 @@
 // Normalize base URL (removes trailing slashes)
-const BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api"
-).replace(/\/+$/, "");
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 /* -------------------------------------------------------
    Utility: Safe JSON parsing (never throws)
