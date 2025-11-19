@@ -19,7 +19,9 @@ function generateToken(user) {
 /* REGISTER */
 export async function register(req, res) {
   try {
-    const { username, password, email } = req.body;
+    console.log("📩 REGISTER BODY:", req.body);
+
+    const { username, password, email } = req.body || {};
 
     if (!username || !password) {
       return res.status(400).json({ error: "Username and password required" });
@@ -51,9 +53,16 @@ export async function register(req, res) {
 /* LOGIN */
 export async function login(req, res) {
   try {
-    const { username, password } = req.body;
+    console.log("🔐 LOGIN HEADERS:", req.headers);
+    console.log("🔐 LOGIN BODY RAW:", req.body);
+
+    // SAFE destructuring
+    const { username, password } = req.body || {};
+
     if (!username || !password) {
-      return res.status(400).json({ error: "Username and password required" });
+      return res
+        .status(400)
+        .json({ error: "Username and password required" });
     }
 
     const user = await prisma.user.findUnique({
@@ -74,20 +83,20 @@ export async function login(req, res) {
       user: { id: user.id, username: user.username, role: user.role },
     });
   } catch (err) {
-    console.error("Login error:", err);
+    console.error("🔥 Login error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 }
 
-/* LOGOUT - stateless: frontend should remove token locally */
+/* LOGOUT */
 export function logout(req, res) {
   try {
     res.clearCookie("token");
   } catch (e) {}
-  return res.json({ message: "Logged out (client should discard token)" });
+  return res.json({ message: "Logged out" });
 }
 
-/* ME - uses authenticate middleware (req.user) */
+/* ME */
 export async function me(req, res) {
   try {
     if (!req.user?.id) {
