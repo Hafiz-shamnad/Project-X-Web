@@ -1,15 +1,12 @@
 /**
- * API Client Utility
- * ------------------
- * Fast, safe, minimal wrapper around fetch().
- * - Auto-select API URL (env > localhost)
- * - Safe JSON parsing (handles empty responses)
- * - Normalized errors with meaningful messages
- * - Includes credentials for cookie-based auth
+ * API Client Utility (Production-Optimized)
+ * Handles:
+ *  - Full CORS + cookie support
+ *  - Safe JSON parsing
+ *  - Works on Vercel + Railway
  */
 
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL;
+export const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 /* ----------------------------------------------
  * Types
@@ -29,47 +26,46 @@ export async function apiFetch<T = any>(
 
   const req: RequestInit = {
     method: options.method || "GET",
-    credentials: "include",
+    credentials: "include",   // REQUIRED for cookies to work
+    mode: "cors",
     headers: {
+      Accept: "application/json",
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
-    body: options.body,
+    body:
+      options.method && options.method !== "GET"
+        ? options.body
+        : undefined,
   };
 
   let res: Response;
 
-  /** -----------------------------------------
-   * Network layer catch (DNS / offline / blocked)
-   * ----------------------------------------- */
+  // NETWORK ERRORS (DNS fail, CORS block, backend offline)
   try {
     res = await fetch(url, req);
   } catch (err) {
-    const msg = (err as Error)?.message || "Unknown network error";
-    throw new Error(`Network unreachable: ${msg}`);
+    throw new Error(
+      `Network unreachable: ${(err as Error)?.message || "Unknown error"}`
+    );
   }
 
-  /** -----------------------------------------
-   * Parse response (safe for 204/empty bodies)
-   * ----------------------------------------- */
+  // SAFELY PARSE JSON
   let data: any = null;
   if (res.status !== 204) {
     try {
       data = await res.json();
     } catch {
-      throw new Error("Server returned invalid JSON.");
+      throw new Error("Server returned invalid JSON response.");
     }
   }
 
-  /** -----------------------------------------
-   * Normalize API errors
-   * ----------------------------------------- */
+  // NORMALIZE API ERRORS
   if (!res.ok) {
     const msg =
       data?.error ||
       data?.message ||
       `Request failed with status ${res.status}`;
-
     throw new Error(msg);
   }
 
