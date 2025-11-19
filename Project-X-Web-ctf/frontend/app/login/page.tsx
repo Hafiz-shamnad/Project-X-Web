@@ -30,7 +30,7 @@ export default function LoginPage() {
       try {
         const response = await apiFetch("/auth/login", {
           method: "POST",
-          body: JSON.stringify(form),
+          body: form as any,
         });
 
         const role = response?.user?.role;
@@ -47,8 +47,7 @@ export default function LoginPage() {
       } catch (err: any) {
         setStatus({
           loading: false,
-          error:
-            err?.message || "Unexpected server error. Please try again.",
+          error: err?.message || "Unexpected server error. Please try again.",
         });
       }
     },
