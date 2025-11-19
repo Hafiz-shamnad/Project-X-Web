@@ -12,9 +12,19 @@ export default function DashboardPageClient() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // ❗ block SSR
+    if (typeof window === "undefined") return;
+
     let cancelled = false;
 
     async function checkAuth() {
+      // ❗ Ensure token exists before sending /auth/me
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.replace("/login");
+        return;
+      }
+
       try {
         const res = await apiFetch("/auth/me");
 
@@ -32,8 +42,12 @@ export default function DashboardPageClient() {
       }
     }
 
-    checkAuth();
-    return () => { cancelled = true };
+    // Delay to ensure hydration completed (fixes early null localStorage)
+    setTimeout(checkAuth, 0);
+
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   if (loading) return <LoadingScreen />;
