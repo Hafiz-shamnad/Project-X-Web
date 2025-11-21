@@ -1,10 +1,7 @@
-// ===================================
-// app/layout.tsx
-// ===================================
 import type { Metadata } from "next";
 import "./globals.css";
-import Navbar from "./components/Navbar";
 
+import NavbarWrapper from "./components/NavbarWrapper";
 
 export const metadata: Metadata = {
   title: "Project X - CTF Platform",
@@ -19,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-mono">
-        <Navbar />
+        <NavbarWrapper /> 
         {children}
       </body>
     </html>

@@ -93,7 +93,9 @@ export default function Navbar() {
           const data = await res.json();
           setUser(data.user);
         }
-      } catch {}
+      } catch {
+        // ignore
+      }
     };
 
     loadUser();
@@ -246,7 +248,13 @@ export default function Navbar() {
             </button>
 
             {openMenu && (
-              <div className="absolute right-0 mt-3 w-60 bg-slate-900/95 border border-blue-500/30 rounded-xl shadow-2xl py-2">
+              <div
+                className="
+                  absolute right-0 mt-3 w-60 bg-slate-900/95 
+                  border border-blue-500/30 rounded-xl shadow-2xl py-2
+                  z-[200000] overflow-visible
+                "
+              >
                 <Link
                   href="/profile"
                   onClick={() => setOpenMenu(false)}
@@ -278,8 +286,8 @@ export default function Navbar() {
 
                 <div className="border-t border-blue-800/40 my-2" />
 
-                <div className="px-3 py-1.5">
-                  <LogoutButton backendURL={BACKEND_URL} />
+                <div className="px-3 py-2">
+                  <LogoutButton />
                 </div>
               </div>
             )}
@@ -309,7 +317,13 @@ export default function Navbar() {
             onClick={() => setOpenMobile(false)}
           />
 
-          <div className="fixed top-[70px] left-0 right-0 bg-slate-900/95 z-50 p-6 border-b border-blue-500/40 shadow-xl">
+          <div
+            className="
+              fixed top-[70px] left-0 right-0 bottom-0 
+              bg-slate-900/95 z-50 p-6 border-b border-blue-500/40 shadow-xl
+              overflow-y-auto
+            "
+          >
             <div className="flex items-center gap-3 mb-5 p-4 rounded-lg bg-blue-900/20 border border-blue-500/20">
               <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-black font-bold">
                 {user ? user.username[0].toUpperCase() : "?"}
@@ -338,7 +352,7 @@ export default function Navbar() {
             </Link>
 
             <div className="pt-3">
-              <LogoutButton backendURL={BACKEND_URL} />
+              <LogoutButton />
             </div>
           </div>
         </>

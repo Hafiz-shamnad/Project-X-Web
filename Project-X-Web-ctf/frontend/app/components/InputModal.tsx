@@ -9,9 +9,10 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, type Transition } from "framer-motion";
+import { AlertCircle, X } from "lucide-react";
 
 /* ---------------------------------------
-   TYPES
+   PROPS
 ---------------------------------------- */
 interface InputModalProps {
   isOpen: boolean;
@@ -22,18 +23,18 @@ interface InputModalProps {
   placeholder?: string;
   confirmText?: string;
   cancelText?: string;
-  onConfirm: (value: string) => void;
+  onConfirm: (value: string) => void | Promise<void>;
   onCancel: () => void;
 }
 
 export default function InputModal({
   isOpen,
   title = "Enter Value",
-  message = "Please provide the required input.",
+  message = "Provide the required input.",
   label = "Value",
   inputType = "text",
   placeholder = "",
-  confirmText = "Confirm",
+  confirmText = "Submit",
   cancelText = "Cancel",
   onConfirm,
   onCancel,
@@ -42,27 +43,16 @@ export default function InputModal({
   const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  /* ---------------------------------------
-     SSR-SAFE MOUNT
-  ---------------------------------------- */
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => setMounted(true), []);
 
-  /* ---------------------------------------
-     RESET VALUE ON CLOSE
-  ---------------------------------------- */
   useEffect(() => {
     if (!isOpen) setValue("");
   }, [isOpen]);
 
-  /* ---------------------------------------
-     KEYBOARD SHORTCUTS (useCallback safe)
-  ---------------------------------------- */
+  /* Keyboard shortcuts */
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
       if (!isOpen) return;
-
       if (e.key === "Escape") onCancel();
       if (e.key === "Enter" && value.trim()) onConfirm(value);
     },
@@ -71,23 +61,15 @@ export default function InputModal({
 
   useEffect(() => {
     if (!isOpen) return;
-
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [isOpen, handleKey]);
 
-  /* ---------------------------------------
-     Auto Focus on Open
-  ---------------------------------------- */
+  /* Autofocus */
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 80);
-    }
+    if (isOpen) setTimeout(() => inputRef.current?.focus(), 100);
   }, [isOpen]);
 
-  /* ---------------------------------------
-     Memoize portal root (avoid recreating)
-  ---------------------------------------- */
   const portalRoot = useMemo(
     () => (typeof document !== "undefined" ? document.body : null),
     []
@@ -95,23 +77,17 @@ export default function InputModal({
 
   if (!mounted || !portalRoot) return null;
 
-  /* ---------------------------------------
-     Framer Motion Animations (typed)
-  ---------------------------------------- */
   const modalTransition: Transition = {
     type: "spring",
-    stiffness: 200,
-    damping: 18,
+    stiffness: 220,
+    damping: 20,
   };
 
   return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-[9999] flex items-center justify-center 
-                     bg-black/80 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
+          className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 backdrop-blur-xl"
           onClick={(e) => e.target === e.currentTarget && onCancel()}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -119,67 +95,95 @@ export default function InputModal({
         >
           <motion.div
             className="
-              relative bg-gray-950 border border-green-500/60 
-              rounded-xl p-7 shadow-[0_0_25px_rgba(0,255,150,0.35)]
-              max-w-sm w-full overflow-hidden
+              relative bg-slate-900/90 border border-blue-500/30 rounded-2xl 
+              p-8 max-w-md w-full shadow-[0_8px_32px_rgba(59,130,246,0.25)]
+              overflow-hidden
             "
-            initial={{ scale: 0.8, opacity: 0 }}
+            initial={{ scale: 0.85, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.85, opacity: 0 }}
             transition={modalTransition}
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* Green glow */}
-            <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent pointer-events-none" />
+            {/* Glow */}
+            <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/20 blur-3xl pointer-events-none" />
 
-            {/* Title */}
-            <h3 className="text-xl font-bold text-green-400 mb-3 tracking-wide">
-              {title}
-            </h3>
+            {/* Grid pattern */}
+            <div className="
+                absolute inset-0 pointer-events-none 
+                bg-[linear-gradient(rgba(59,130,246,0.04)_1px,transparent_1px),
+                     linear-gradient(90deg,rgba(59,130,246,0.04)_1px,transparent_1px)]
+                bg-[size:20px_20px]
+            " />
 
-            {/* Message */}
-            <p className="text-green-300/90 text-sm mb-6 leading-relaxed">
-              {message}
-            </p>
+            {/* Close button */}
+            <button
+              onClick={onCancel}
+              className="absolute top-4 right-4 p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
-            {/* Input Field */}
-            <label className="block text-sm text-green-400 mb-2">{label}</label>
+            {/* Content */}
+            <div className="relative">
+              {/* Title */}
+              <h3 className="text-2xl font-black text-blue-300 mb-3 flex items-center gap-2">
+                <AlertCircle className="w-6 h-6 text-blue-400" />
+                {title}
+              </h3>
 
-            <input
-              ref={inputRef}
-              type={inputType}
-              value={value}
-              placeholder={placeholder}
-              onChange={(e) => setValue(e.target.value)}
-              className="
-                w-full p-3 bg-gray-800 text-white text-sm rounded
-                border border-green-500 focus:ring-2 focus:ring-green-400 
-                focus:outline-none placeholder-green-300/40
-              "
-            />
+              {/* Message */}
+              <p className="text-slate-300 text-sm mb-6 leading-relaxed">
+                {message}
+              </p>
 
-            {/* Buttons */}
-            <div className="flex justify-end gap-3 mt-7">
-              <button
-                onClick={onCancel}
+              {/* Label */}
+              <label className="block text-sm text-blue-400 mb-2">{label}</label>
+
+              {/* Input */}
+              <input
+                ref={inputRef}
+                type={inputType}
+                placeholder={placeholder}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
                 className="
-                  px-4 py-2 rounded text-green-300 bg-gray-800
-                  hover:bg-gray-700 transition border border-green-500/30
+                  w-full p-3 bg-slate-800/60 rounded-xl text-blue-200 
+                  border border-blue-500/30 placeholder-blue-500/40
+                  focus:outline-none focus:border-blue-400
+                  focus:ring-2 focus:ring-blue-600/40
+                  transition
                 "
-              >
-                {cancelText}
-              </button>
+              />
 
-              <button
-                onClick={() => onConfirm(value)}
-                disabled={!value.trim()}
-                className="
-                  px-5 py-2 rounded font-semibold text-black
-                  bg-green-500 hover:bg-green-400 transition
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                "
-              >
-                {confirmText}
-              </button>
+              {/* Buttons */}
+              <div className="flex justify-end gap-3 mt-7">
+                <button
+                  onClick={onCancel}
+                  className="
+                    px-5 py-2 rounded-xl font-semibold
+                    bg-slate-800/50 border border-slate-700 text-slate-300
+                    hover:bg-slate-800 hover:text-white hover:border-slate-600
+                    transition-all
+                  "
+                >
+                  {cancelText}
+                </button>
+
+                <button
+                  disabled={!value.trim()}
+                  onClick={() => onConfirm(value)}
+                  className="
+                    px-5 py-2 rounded-xl font-bold text-white
+                    bg-gradient-to-r from-blue-500 to-cyan-500
+                    hover:from-blue-600 hover:to-cyan-600
+                    shadow-lg transition-all hover:scale-105
+                    disabled:opacity-40 disabled:cursor-not-allowed
+                  "
+                >
+                  {confirmText}
+                </button>
+              </div>
             </div>
           </motion.div>
         </motion.div>

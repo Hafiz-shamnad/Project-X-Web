@@ -10,19 +10,23 @@ interface Props {
   openConfirm: (
     title: string,
     message: string,
-    onConfirm: () => Promise<void>
+    onConfirm: () => Promise<void>,
+    variant?: "danger" | "warning" | "success"
   ) => void;
+
   openInput: (
     title: string,
     message: string,
     label: string,
     onConfirm: (value: string) => Promise<void>
   ) => void;
+
   onTemporaryBan: (id: number, minutes: number) => Promise<void>;
   onPermanentBan: (id: number) => Promise<void>;
   onUnban: (id: number) => Promise<void>;
   onPenalty: (id: number, points: number) => Promise<void>;
 }
+
 
 export default function TeamManager({
   teams,
@@ -41,7 +45,6 @@ export default function TeamManager({
     setExpandedTeamId((prev) => (prev === teamId ? null : teamId));
   };
 
-  /* ---------------- OPTIMIZED FILTER ---------------- */
   const filteredTeams = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return teams;
@@ -49,148 +52,191 @@ export default function TeamManager({
   }, [teams, search]);
 
   return (
-    <section className="space-y-6">
-      <h2 className="text-2xl font-bold text-cyan-400 drop-shadow-md">
+    <section className="space-y-8">
+      {/* Title */}
+      <h2 className="text-3xl font-black text-cyan-400 tracking-wide drop-shadow-md">
         Team Management
       </h2>
 
       {/* Search Bar */}
-      <div className="flex items-center bg-slate-900/70 px-3 py-2 rounded-lg border border-blue-500/40 shadow-md shadow-blue-500/10 w-full md:w-96 backdrop-blur-sm">
+      <div
+        className="flex items-center bg-slate-900/70 px-3 py-2 rounded-xl 
+                    border border-blue-500/40 w-full md:w-96 shadow-md shadow-blue-500/10"
+      >
         <Search className="w-4 h-4 text-blue-300 mr-2 opacity-80" />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search teams..."
-          className="bg-transparent outline-none text-blue-200 w-full placeholder-slate-500"
+          className="bg-transparent outline-none text-blue-200 w-full placeholder-blue-500/40"
         />
       </div>
 
       {/* Loading / Empty */}
       {loading && teams.length === 0 && (
-        <div className="text-blue-300/70">Loading teams...</div>
+        <p className="text-blue-300/70 animate-pulse">Loading teams...</p>
       )}
 
       {!loading && filteredTeams.length === 0 && (
-        <div className="text-blue-300/70">No matching teams.</div>
+        <p className="text-blue-300/70">No teams matched your search.</p>
       )}
 
-      {/* Teams List */}
-      {filteredTeams.map((team) => (
-        <div
-          key={team.id}
-          className="bg-slate-900/60 border border-blue-600/30 rounded-xl p-5 hover:border-blue-500 transition-all shadow-lg shadow-blue-500/5"
-        >
-          {/* Header */}
+      {/* Team Cards */}
+      <div className="grid gap-6">
+        {filteredTeams.map((team) => (
           <div
-            className="flex justify-between items-center cursor-pointer"
-            onClick={() => toggleTeamExpand(team.id)}
+            key={team.id}
+            className="
+            bg-gradient-to-br from-slate-900/70 to-slate-900/40 
+            border border-blue-600/30 rounded-xl p-5 
+            shadow-lg shadow-blue-500/10 hover:border-blue-500/50 
+            transition-all duration-200
+          "
           >
-            <div>
-              <h3 className="text-white font-bold flex items-center gap-2">
-                {team.name}
-              </h3>
+            {/* Header */}
+            <div
+              className="flex justify-between items-center cursor-pointer pb-2"
+              onClick={() => toggleTeamExpand(team.id)}
+            >
+              <div>
+                <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                  {team.name}
+                </h3>
 
-              <p className="text-sm text-slate-400">
-                Score:{" "}
-                <span className="text-cyan-400 font-semibold">
-                  {team.totalScore ?? 0}
-                </span>{" "}
-                • Solves:{" "}
-                <span className="text-yellow-400">
-                  {team.solvedCount ?? 0}
-                </span>
-              </p>
+                <p className="text-sm text-slate-400 mt-1">
+                  <span className="text-cyan-400 font-semibold">
+                    {team.totalScore ?? 0}
+                  </span>{" "}
+                  points •{" "}
+                  <span className="text-yellow-400">
+                    {team.solvedCount ?? 0}
+                  </span>{" "}
+                  solves
+                </p>
+              </div>
+
+              {expandedTeamId === team.id ? (
+                <ChevronUp className="w-6 h-6 text-cyan-400" />
+              ) : (
+                <ChevronDown className="w-6 h-6 text-slate-400" />
+              )}
             </div>
 
-            {expandedTeamId === team.id ? (
-              <ChevronUp className="w-6 h-6 text-cyan-400" />
-            ) : (
-              <ChevronDown className="w-6 h-6 text-slate-400" />
-            )}
-          </div>
-
-          {/* Expanded Body */}
-          {expandedTeamId === team.id && (
-            <div className="mt-4 border-t border-slate-800 pt-4 space-y-3 animate-fadeIn">
-              <div>
-                <p className="text-sm text-slate-400">Members:</p>
-
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {team.members?.length ? (
-                    team.members.map((m) => (
-                      <span
-                        key={m.id}
-                        className="px-3 py-1 bg-slate-800 text-blue-200 rounded-lg border border-blue-700/40 text-sm"
-                      >
-                        {m.username}
+            {/* Expanded Section */}
+            {expandedTeamId === team.id && (
+              <div className="mt-4 pt-4 border-t border-slate-800 space-y-4 animate-fadeIn">
+                {/* Members */}
+                <div>
+                  <p className="text-sm text-slate-400 mb-2">Members:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {team.members?.length ? (
+                      team.members.map((m) => (
+                        <span
+                          key={m.id}
+                          className="px-3 py-1 bg-slate-800/70 text-blue-200 
+                                   rounded-lg border border-blue-700/40 text-sm"
+                        >
+                          {m.username}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-slate-500 text-sm">
+                        No members assigned
                       </span>
-                    ))
-                  ) : (
-                    <span className="text-slate-500 text-sm">
-                      No members yet
-                    </span>
-                  )}
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-wrap gap-3 mt-3">
+                  {/* TEMP BAN (danger) */}
+                  <button
+                    onClick={() =>
+                      openInput(
+                        "Temporary Ban",
+                        "Enter ban duration in minutes:",
+                        "Minutes",
+                        (value) => onTemporaryBan(team.id, Number(value) || 0)
+                      )
+                    }
+                    className="
+                    px-4 py-2 rounded-lg font-medium
+                    bg-red-700/20 text-red-300 border border-red-600/40 
+                    hover:bg-red-700/30 hover:border-red-500/60 
+                    transition shadow-red-600/20 shadow-sm
+                  "
+                  >
+                    Temporary Ban
+                  </button>
+
+                  {/* PERMANENT BAN (danger strong) */}
+                  <button
+                    onClick={() =>
+                      openConfirm(
+                        "Permanent Ban",
+                        "Permanently ban this team?",
+                        () => onPermanentBan(team.id),
+                        "danger"
+                      )
+                    }
+                    className="
+    px-4 py-2 rounded-lg font-semibold
+    bg-gradient-to-br from-red-800/40 to-red-900/60
+    text-red-300 border border-red-700/60
+    hover:from-red-700/50 hover:to-red-900/70
+    hover:text-red-200
+    shadow shadow-red-900/30 hover:shadow-red-700/40
+    transition-all duration-200
+    ring-0 hover:ring-2 hover:ring-red-600/40
+  "
+                  >
+                    Permanent Ban
+                  </button>
+
+                  {/* UNBAN (success) */}
+                  <button
+                    onClick={() =>
+                      openConfirm(
+                        "Unban Team",
+                        "Remove the ban for this team?",
+                        () => onUnban(team.id)
+                      )
+                    }
+                    className="
+                    px-4 py-2 rounded-lg font-medium
+                    bg-emerald-700/20 text-emerald-300 border border-emerald-600/40 
+                    hover:bg-emerald-700/30 hover:border-emerald-500/60 
+                    transition shadow-emerald-500/20 shadow-sm
+                  "
+                  >
+                    Unban
+                  </button>
+
+                  {/* PENALTY (warning) */}
+                  <button
+                    onClick={() =>
+                      openInput(
+                        "Apply Penalty",
+                        "Enter penalty points:",
+                        "Points",
+                        (value) => onPenalty(team.id, Number(value) || 0)
+                      )
+                    }
+                    className="
+                    px-4 py-2 rounded-lg font-medium
+                    bg-yellow-700/20 text-yellow-300 border border-yellow-600/40 
+                    hover:bg-yellow-700/30 hover:border-yellow-500/60 
+                    transition shadow-yellow-600/20 shadow-sm
+                  "
+                  >
+                    Penalty
+                  </button>
                 </div>
               </div>
-
-              {/* Actions */}
-              <div className="flex gap-3 flex-wrap mt-3">
-                <button
-                  onClick={() =>
-                    openInput(
-                      "Temporary Ban",
-                      "Enter ban duration in minutes",
-                      "Minutes",
-                      (value) => onTemporaryBan(team.id, Number(value) || 0)
-                    )
-                  }
-                  className="bg-red-700/20 text-red-300 border border-red-600/30 px-4 py-1 rounded-md hover:bg-red-700/30 transition"
-                >
-                  Temporary Ban
-                </button>
-
-                <button
-                  onClick={() =>
-                    openConfirm(
-                      "Permanent Ban",
-                      "Permanently ban this team?",
-                      () => onPermanentBan(team.id)
-                    )
-                  }
-                  className="bg-red-900/40 text-red-400 border border-red-800/40 px-4 py-1 rounded-md hover:bg-red-900/50 transition"
-                >
-                  Permanent Ban
-                </button>
-
-                <button
-                  onClick={() =>
-                    openConfirm("Unban Team", "Unban this team?", () =>
-                      onUnban(team.id)
-                    )
-                  }
-                  className="bg-yellow-700/20 text-yellow-300 border border-yellow-600/30 px-4 py-1 rounded-md hover:bg-yellow-700/30 transition"
-                >
-                  Unban
-                </button>
-
-                <button
-                  onClick={() =>
-                    openInput(
-                      "Apply Penalty",
-                      "Enter penalty points",
-                      "Points",
-                      (value) => onPenalty(team.id, Number(value) || 0)
-                    )
-                  }
-                  className="bg-blue-700/20 text-blue-300 border border-blue-500/30 px-4 py-1 rounded-md hover:bg-blue-700/30 transition"
-                >
-                  Penalty
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
+            )}
+          </div>
+        ))}
+      </div>
     </section>
   );
 }

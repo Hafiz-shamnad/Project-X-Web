@@ -1,17 +1,19 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { AlertTriangle, CheckCircle, X } from "lucide-react";
 
-interface ConfirmModalProps {
+export type ConfirmVariant = "danger" | "success" | "warning";
+
+export interface ConfirmModalProps {
   isOpen: boolean;
   title?: string;
   message?: string;
   confirmText?: string;
   cancelText?: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onCancel: () => void;
+  variant?: ConfirmVariant;
 }
 
 export default function ConfirmModal({
@@ -22,92 +24,112 @@ export default function ConfirmModal({
   cancelText = "Cancel",
   onConfirm,
   onCancel,
+  variant = "warning",
 }: ConfirmModalProps) {
-  const [mounted, setMounted] = useState(false);
 
-  // Set mounted state only once (safe for SSR)
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  if (!isOpen || typeof document === "undefined") return null;
 
-  // Memoize portal root
-  const portalRoot = useMemo(() => {
-    if (typeof document !== "undefined") return document.body;
-    return null;
-  }, []);
-
-  // Stable handlers (avoid re-renders)
-  const handleConfirm = useCallback(() => onConfirm(), [onConfirm]);
-  const handleCancel = useCallback(() => onCancel(), [onCancel]);
-
-  if (!mounted || !portalRoot) return null;
-
-  /* ----------------- Shared Animations ----------------- */
-  const overlayAnim = {
-    initial: { opacity: 0 },
-    animate: { opacity: 1 },
-    exit: { opacity: 0 },
-  };
-
-  const modalAnim = {
-    initial: { scale: 0.85, opacity: 0 },
-    animate: { scale: 1, opacity: 1 },
-    exit: { scale: 0.85, opacity: 0 },
-    transition: {
-      type: "spring",
-      stiffness: 180,
-      damping: 20,
-    } as const,
-  };
+  const styles = {
+    danger: {
+      iconBg: "from-red-500/20 to-orange-500/10",
+      iconBorder: "border-red-500/40",
+      icon: <AlertTriangle className="w-8 h-8 text-red-400" />,
+      titleColor: "text-red-300",
+      confirmBg: "from-red-500 to-orange-500",
+      confirmHover: "hover:from-red-600 hover:to-orange-600",
+      glow: "bg-red-500/20",
+    },
+    success: {
+      iconBg: "from-emerald-500/20 to-green-500/10",
+      iconBorder: "border-emerald-500/40",
+      icon: <CheckCircle className="w-8 h-8 text-emerald-400" />,
+      titleColor: "text-emerald-300",
+      confirmBg: "from-emerald-500 to-green-500",
+      confirmHover: "hover:from-emerald-600 hover:to-green-600",
+      glow: "bg-emerald-500/20",
+    },
+    warning: {
+      iconBg: "from-yellow-500/20 to-amber-500/10",
+      iconBorder: "border-yellow-500/40",
+      icon: <AlertTriangle className="w-8 h-8 text-yellow-400" />,
+      titleColor: "text-yellow-300",
+      confirmBg: "from-blue-500 to-cyan-500",
+      confirmHover: "hover:from-blue-600 hover:to-cyan-600",
+      glow: "bg-yellow-500/20",
+    },
+  }[variant];
 
   return createPortal(
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          {...overlayAnim}
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="confirm-modal-title"
-          aria-describedby="confirm-modal-message"
+    <div
+      className="
+        fixed inset-0 z-[999999] flex items-center justify-center p-4
+        bg-black/80 backdrop-blur-xl
+      "
+      onClick={onCancel}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="
+          relative bg-slate-900/90 border border-blue-500/30 
+          rounded-2xl shadow-[0_8px_32px_rgba(59,130,246,0.2)] 
+          max-w-md w-full p-8 overflow-hidden
+        "
+      >
+        <div className={`absolute top-0 right-0 w-48 h-48 ${styles.glow} rounded-full blur-3xl pointer-events-none`} />
+
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none" />
+
+        <button
+          onClick={onCancel}
+          className="absolute top-4 right-4 z-10 p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all"
         >
-          <motion.div
-            {...modalAnim}
-            className="bg-gray-900 border border-green-500 p-8 rounded-xl text-center shadow-lg max-w-sm w-full"
-          >
-            {/* Title */}
-            <h3
-              id="confirm-modal-title"
-              className="text-xl font-semibold mb-4 text-green-400"
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="relative text-center">
+          <div className="flex justify-center mb-6">
+            <div
+              className={`p-4 rounded-2xl bg-gradient-to-br ${styles.iconBg} border ${styles.iconBorder} backdrop-blur-sm`}
             >
-              {title}
-            </h3>
-
-            {/* Message */}
-            <p id="confirm-modal-message" className="text-green-300 mb-6">
-              {message}
-            </p>
-
-            {/* Buttons */}
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={handleConfirm}
-                className="bg-green-500 text-black px-5 py-2 rounded font-bold hover:bg-green-400 transition-colors"
-              >
-                {confirmText}
-              </button>
-
-              <button
-                onClick={handleCancel}
-                className="bg-gray-700 text-green-400 px-5 py-2 rounded font-bold hover:bg-gray-600 transition-colors"
-              >
-                {cancelText}
-              </button>
+              {styles.icon}
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    portalRoot
+          </div>
+
+          <h3 className={`text-2xl font-black mb-4 ${styles.titleColor}`}>
+            {title}
+          </h3>
+
+          <p className="text-slate-300 text-base leading-relaxed mb-8">
+            {message}
+          </p>
+
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={onConfirm}
+              className={`
+                px-6 py-3 rounded-xl font-bold text-white 
+                bg-gradient-to-r ${styles.confirmBg} ${styles.confirmHover} 
+                shadow-lg transition-all duration-300 hover:scale-105
+              `}
+            >
+              {confirmText}
+            </button>
+
+            <button
+              onClick={onCancel}
+              className="
+                px-6 py-3 rounded-xl font-bold text-slate-300 
+                bg-slate-800/50 border border-slate-700 
+                hover:bg-slate-800 hover:text-white hover:border-slate-600 
+                transition-all duration-300
+              "
+            >
+              {cancelText}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
