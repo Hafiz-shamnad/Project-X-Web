@@ -1,6 +1,6 @@
 /**
- * User Routes (ESM)
- * -----------------
+ * User Routes (ESM + Optimized)
+ * -----------------------------
  */
 
 import express from "express";
@@ -10,24 +10,23 @@ import {
   toggleSolve,
 } from "../controllers/userController.js";
 
+import { authenticate } from "../middlewares/auth.js";
+
 const router = express.Router();
 
-/**
- * Create or retrieve a user
- * POST /api/user
- */
+/* =====================================================
+   CREATE OR RETRIEVE USER (for legacy / compatibility)
+   ===================================================== */
 router.post("/", createOrGetUser);
 
-/**
- * Toggle solve status
- * POST /api/user/solve
- */
-router.post("/solve", toggleSolve);
+/* =====================================================
+   SOLVE TOGGLE (must be protected)
+   ===================================================== */
+router.post("/solve", authenticate, toggleSolve);
 
-/**
- * Get a user's profile and solve history
- * GET /api/user/:username
- */
+/* =====================================================
+   PUBLIC USER PROFILE
+   ===================================================== */
 router.get("/:username", getUser);
 
 export default router;

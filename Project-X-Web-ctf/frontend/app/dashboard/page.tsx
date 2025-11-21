@@ -14,7 +14,7 @@ import { useChallenges } from "../hooks/useChallenges";
 
 import type { Challenge } from "../types/Challenge";
 
-export default function ProjectXCTF() {
+export default function DashboardPage() {
   const [selected, setSelected] = useState<Challenge | null>(null);
 
   const { user, loading, bannedDate, isTempBanned, isPermanentBanned } =

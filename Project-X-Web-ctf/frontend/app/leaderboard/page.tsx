@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Trophy, Flag, Medal, Crown, Award, Zap, TrendingUp } from "lucide-react";
 
 export const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  process.env.NEXT_PUBLIC_API_URL;
 
 interface TeamData {
   id: number;

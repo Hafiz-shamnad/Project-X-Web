@@ -8,9 +8,6 @@ export function useChallenges() {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [loading, setLoading] = useState(false);
 
-  /* ---------------------------------------------
-     FETCH CHALLENGES (Memoized)
-  --------------------------------------------- */
   const fetchChallenges = useCallback(async () => {
     setLoading(true);
     try {
@@ -20,10 +17,6 @@ export function useChallenges() {
       setLoading(false);
     }
   }, []);
-
-  /* ---------------------------------------------
-     CRUD Operations (Memoized, no stale closures)
-  --------------------------------------------- */
 
   const createChallenge = useCallback(
     async (fd: FormData) => {
@@ -49,9 +42,6 @@ export function useChallenges() {
     [fetchChallenges]
   );
 
-  /* ---------------------------------------------
-     Memoized Return Object (Prevents re-renders)
-  --------------------------------------------- */
   return useMemo(
     () => ({
       challenges,

@@ -1,6 +1,5 @@
 /**
- * Project_X - Production Server (ESM Version)
- * Secure, Strict & Scalable Express + WebSocket Setup
+ * Project_X Backend (FINAL FIXED)
  */
 
 import "dotenv/config";
@@ -9,15 +8,13 @@ import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
-import morgan from "morgan";
-import path from "path";
-import fs from "fs";
 import compression from "compression";
 import http from "http";
-
+import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 
-// DB + Jobs
+// DB
 import { initDB } from "./src/config/db.js";
 import { autoStopExpiredContainers } from "./src/jobs/autostopper.js";
 
@@ -35,76 +32,92 @@ import teamRoutes from "./src/routes/teamRoutes.js";
 import profileRoutes from "./src/routes/profileRoutes.js";
 import announcementRoutes from "./src/routes/announcementRoutes.js";
 
-// --------------------------------------------------------------------------
-// Init
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Handle __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// WebSocket
 const server = http.createServer(app);
-initWebSocketServer(server);
 
-// --------------------------------------------------------------------------
-// Security
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// FRONTEND + BACKEND CONFIG
+// ----------------------------------------------------------------------------
 
-app.use(
-  helmet({
-    contentSecurityPolicy: false,
-  })
-);
+const FRONTEND = "https://project-x-web-ten.vercel.app";
+const BACKEND_DOMAIN = "project-x-backend-production-0313.up.railway.app";
 
-app.use(compression());
+console.log("🌐 FRONTEND:", FRONTEND);
+console.log("🌐 BACKEND DOMAIN:", BACKEND_DOMAIN);
 
-const apiLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 120,
-  standardHeaders: true,
-  message: { error: "Too many requests, slow down." },
-});
-
-app.use("/api", apiLimiter);
-
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
-    credentials: true,
-  })
-);
+// ----------------------------------------------------------------------------
+// ORDER IS CRITICAL: Body parser MUST be FIRST
+// ----------------------------------------------------------------------------
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-if (process.env.NODE_ENV !== "production") {
-  app.use(morgan("dev"));
-}
+// ----------------------------------------------------------------------------
+// Security
+// ----------------------------------------------------------------------------
 
-// --------------------------------------------------------------------------
-// Database
-// --------------------------------------------------------------------------
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+
+app.use(compression());
+app.set("trust proxy", 1);
+
+// ----------------------------------------------------------------------------
+// CORS (FULLY FIXED)
+// ----------------------------------------------------------------------------
+
+app.use(
+  cors({
+    origin: FRONTEND,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// Preflight support (Node 22 + Express 5 fixed)
+app.options(/.*/, (req, res) => {
+  res.header("Access-Control-Allow-Origin", FRONTEND);
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.sendStatus(200);
+});
+
+// ----------------------------------------------------------------------------
+// Rate Limit
+// ----------------------------------------------------------------------------
+
+app.use(
+  rateLimit({
+    windowMs: 60_000,
+    max: 200,
+  })
+);
+
+// ----------------------------------------------------------------------------
+// DB / Jobs / WS
+// ----------------------------------------------------------------------------
 
 initDB();
+autoStopExpiredContainers?.();
+initWebSocketServer(server);
 
-// --------------------------------------------------------------------------
-// Cron Jobs
-// --------------------------------------------------------------------------
-
-setInterval(() => {
-  autoStopExpiredContainers().catch((err) =>
-    console.error("Auto-stop job error:", err)
-  );
-}, 60000);
-
-// --------------------------------------------------------------------------
-// Routes
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// API ROUTES
+// ----------------------------------------------------------------------------
 
 app.use("/api/challenges", challengeRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
@@ -116,9 +129,9 @@ app.use("/api/team", teamRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/announcement", announcementRoutes);
 
-// --------------------------------------------------------------------------
-// Static
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// Static files
+// ----------------------------------------------------------------------------
 
 app.use(
   "/uploads",
@@ -128,66 +141,42 @@ app.use(
   })
 );
 
-// --------------------------------------------------------------------------
-// Downloads
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// Download
+// ----------------------------------------------------------------------------
 
-app.get("/api/download/:filename", (req, res) => {
-  const file = req.params.filename;
-
-  if (!/^[a-zA-Z0-9._-]+$/.test(file)) {
-    return res.status(400).json({ error: "Invalid filename" });
-  }
-
+app.get("/api/download/:file", (req, res) => {
+  const file = req.params.file;
   const filePath = path.join(__dirname, "uploads", file);
 
   if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: "File not found" });
+    return res.status(404).json({ error: "Not found" });
   }
 
-  res.download(filePath, file);
+  res.download(filePath);
 });
 
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Health
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 app.get("/api/health", (req, res) => {
-  res.json({
-    ok: true,
-    timestamp: new Date(),
-    mode: process.env.NODE_ENV ?? "dev",
-  });
+  res.json({ ok: true, time: new Date() });
 });
 
-// --------------------------------------------------------------------------
-// Error Handler
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// Error handler
+// ----------------------------------------------------------------------------
 
 app.use((err, req, res, next) => {
-  console.error("🔥 Global Error:", err);
-  res
-    .status(err.status || 500)
-    .json({ error: err.message || "Internal Server Error" });
+  console.error("🔥 ERROR:", err);
+  res.status(500).json({ error: err.message || "Server error" });
 });
 
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Start Server
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
-server.listen(PORT, () =>
-  console.log(`🚀 Project_X API + WebSocket running on ${PORT}`)
-);
-
-// --------------------------------------------------------------------------
-// Fail-safe
-// --------------------------------------------------------------------------
-
-process.on("unhandledRejection", (err) =>
-  console.error("UNHANDLED REJECTION:", err)
-);
-
-process.on("uncaughtException", (err) => {
-  console.error("UNCAUGHT EXCEPTION:", err);
-  process.exit(1);
+server.listen(PORT, () => {
+  console.log(`🚀 Project_X backend running on port ${PORT}`);
 });

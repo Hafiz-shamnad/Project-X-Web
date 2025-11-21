@@ -1,32 +1,44 @@
 /**
- * Announcement Controller (ESM + Optimized)
+ * Announcement Controller (ESM + Secured + Optimized)
  */
 
 import prisma from "../config/db.js";
 import { broadcast } from "../lib/ws/ws.js";
 
 /* -------------------------------------------------------------------------- */
-/*                               Create Announcement                            */
+/*                               Create Announcement                           */
 /* -------------------------------------------------------------------------- */
 
 export async function createAnnouncement(req, res) {
   try {
-    const { title, message } = req.body;
+    // 🔒 Admin-only action
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Admin only" });
+    }
 
-    if (!title || !message)
-      return res.status(400).json({ error: "Missing fields" });
+    const title = req.body.title?.trim();
+    const message = req.body.message?.trim();
+
+    if (!title || !message) {
+      return res.status(400).json({ error: "Title and message required" });
+    }
 
     const ann = await prisma.announcement.create({
       data: { title, message },
     });
 
-    broadcast({
-      type: "announcement",
-      id: ann.id,
-      title: ann.title,
-      message: ann.message,
-      createdAt: ann.createdAt,
-    });
+    // WS should never block API
+    try {
+      broadcast({
+        type: "announcement",
+        id: ann.id,
+        title: ann.title,
+        message: ann.message,
+        createdAt: ann.createdAt,
+      });
+    } catch (e) {
+      console.error("WS broadcast failed:", e);
+    }
 
     return res.json(ann);
   } catch (err) {
@@ -53,13 +65,25 @@ export async function getAnnouncements(req, res) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                    Mark Read                                 */
+/*                                    Mark Read                               */
 /* -------------------------------------------------------------------------- */
 
 export async function markRead(req, res) {
   try {
     const announcementId = Number(req.params.id);
     const userId = req.user.id;
+
+    if (isNaN(announcementId)) {
+      return res.status(400).json({ error: "Invalid announcement ID" });
+    }
+
+    // Ensure announcement exists
+    const exists = await prisma.announcement.findUnique({
+      where: { id: announcementId },
+      select: { id: true }
+    });
+
+    if (!exists) return res.status(404).json({ error: "Announcement not found" });
 
     await prisma.announcementRead.upsert({
       where: { announcementId_userId: { announcementId, userId } },
@@ -75,7 +99,7 @@ export async function markRead(req, res) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                 Unread Count                                 */
+/*                                 Unread Count                                */
 /* -------------------------------------------------------------------------- */
 
 export async function unreadCount(req, res) {
@@ -83,7 +107,13 @@ export async function unreadCount(req, res) {
     const userId = req.user.id;
 
     const unread = await prisma.announcement.count({
-      where: { reads: { none: { userId } } },
+      where: {
+        reads: {
+          none: {
+            userId: userId
+          }
+        }
+      }
     });
 
     return res.json({ unread });

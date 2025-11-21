@@ -43,7 +43,7 @@ interface ProfileForm {
 
 // API helper function
 async function apiFetch(endpoint: string, options?: any) {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL;
   const res = await fetch(`${baseUrl}${endpoint}`, {
     credentials: 'include',
     headers: {
