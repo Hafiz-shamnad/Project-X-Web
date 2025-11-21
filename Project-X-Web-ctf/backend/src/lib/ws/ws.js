@@ -1,5 +1,5 @@
 /**
- * WebSocket Server (JWT Auth + Origin-safe + Browser-safe)
+ * WebSocket Server (Browser-safe + Cookie-safe + JWT Auth)
  */
 
 import { WebSocketServer } from "ws";
@@ -7,25 +7,30 @@ import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// Allowed frontend for WS
-const FRONTEND = "http://localhost:3000";
+// Allowed frontend origins
+const ALLOWED_ORIGINS = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+];
 
 let wss = null;
 let clients = new Set();
 
 /**
- * Extract JWT token
- * - Authorization: Bearer xxx (CLI)
- * - ws://host/ws?token=xxx (Browser)
+ * Extract token from:
+ *  - ws://host/ws?token=xxx  (browser)
+ *  - Authorization: Bearer xxx (CLI/tools)
  */
 function extractToken(req) {
+  // CLI / tools
   const auth = req.headers?.authorization;
   if (auth && auth.startsWith("Bearer ")) {
     return auth.slice(7);
   }
 
+  // Browser: token query
   try {
-    const url = new URL(req.url, "http://localhost"); 
+    const url = new URL(req.url, "http://localhost");
     return url.searchParams.get("token");
   } catch (_) {}
 
@@ -36,22 +41,25 @@ export function initWebSocketServer(server) {
   wss = new WebSocketServer({ noServer: true });
 
   server.on("upgrade", (req, socket, head) => {
-    // Only handle /ws path
     if (!req.url.startsWith("/ws")) {
       socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
       socket.destroy();
       return;
     }
 
-    // --- ORIGIN CHECK (browser security) ---
-    const origin = req.headers.origin || "";
-    if (origin && origin !== FRONTEND) {
+    /* ---------------------------------------------------------
+       ORIGIN VALIDATION (Browser security)
+    --------------------------------------------------------- */
+    const origin = req.headers.origin ?? "";
+    if (origin && !ALLOWED_ORIGINS.includes(origin)) {
       socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
       socket.destroy();
       return;
     }
 
-    // --- TOKEN CHECK ---
+    /* ---------------------------------------------------------
+       TOKEN VALIDATION
+    --------------------------------------------------------- */
     const token = extractToken(req);
 
     if (!token) {
@@ -69,17 +77,17 @@ export function initWebSocketServer(server) {
       return;
     }
 
-    // Upgrade to WebSocket
+    /* ---------------------------------------------------------
+       UPGRADE TO WEBSOCKET
+    --------------------------------------------------------- */
     wss.handleUpgrade(req, socket, head, (ws) => {
       wss.emit("connection", ws, req);
     });
   });
 
-  // *** DO NOT SET CORS HEADERS FOR WebSockets ***
-  // Browsers do not use CORS for WS; adding CORS breaks HTTP response headers.
-  // wss.on("headers", ...) was removed.
-
-  // --- On Client Connection ---
+  /* ---------------------------------------------------------
+     CLIENT CONNECTED
+  --------------------------------------------------------- */
   wss.on("connection", (ws, req) => {
     ws.user = req.user;
     clients.add(ws);
@@ -92,12 +100,12 @@ export function initWebSocketServer(server) {
     });
   });
 
-  console.log("🔌 WebSocket server initialized (JWT + Origin-safe)");
+  console.log("🔌 WebSocket server initialized (JWT + Browser-safe)");
   return wss;
 }
 
 /**
- * Broadcast event to all connected clients
+ * Send event to all clients
  */
 export function broadcast(event) {
   const msg = JSON.stringify(event);

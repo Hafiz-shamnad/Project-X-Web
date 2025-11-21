@@ -1,5 +1,5 @@
 /**
- * Project_X Backend (FINAL FIXED)
+ * Project_X Backend (FINAL — STABLE, OPTIMIZED & SECURE)
  */
 
 import "dotenv/config";
@@ -46,14 +46,12 @@ const server = http.createServer(app);
 // FRONTEND + BACKEND CONFIG
 // ----------------------------------------------------------------------------
 
-const FRONTEND = "https://project-x-web-ten.vercel.app";
-const BACKEND_DOMAIN = "project-x-backend-production-0313.up.railway.app";
+const FRONTEND = process.env.FRONTEND_URL || "https://project-x-web-ten.vercel.app";
 
 console.log("🌐 FRONTEND:", FRONTEND);
-console.log("🌐 BACKEND DOMAIN:", BACKEND_DOMAIN);
 
 // ----------------------------------------------------------------------------
-// ORDER IS CRITICAL: Body parser MUST be FIRST
+// ORDER IS CRITICAL: Body parser FIRST
 // ----------------------------------------------------------------------------
 
 app.use(express.json({ limit: "10mb" }));
@@ -61,35 +59,47 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // ----------------------------------------------------------------------------
-// Security
+// SECURITY MIDDLEWARE
 // ----------------------------------------------------------------------------
 
 app.use(
   helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: false, // React apps need relaxed CSP
     crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false,
   })
 );
 
+app.set("trust proxy", 1); // Required for Railway / Vercel / Nginx
 app.use(compression());
-app.set("trust proxy", 1);
 
-// ----------------------------------------------------------------------------
-// CORS (FULLY FIXED)
-// ----------------------------------------------------------------------------
+/* ----------------------------------------------------------------------------
+   CORS — WORKING IN LOCAL + PRODUCTION
+---------------------------------------------------------------------------- */
+
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  process.env.FRONTEND_URL,
+  "https://project-x-web-ten.vercel.app",
+].filter(Boolean);
 
 app.use(
   cors({
-    origin: FRONTEND,
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);           // Allow mobile apps / curl / same-origin
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error("CORS blocked: " + origin));
+    },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   })
 );
 
-// Preflight support (Node 22 + Express 5 fixed)
+// Correct preflight
 app.options(/.*/, (req, res) => {
-  res.header("Access-Control-Allow-Origin", FRONTEND);
+  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
   res.header("Access-Control-Allow-Credentials", "true");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
@@ -97,21 +107,23 @@ app.options(/.*/, (req, res) => {
 });
 
 // ----------------------------------------------------------------------------
-// Rate Limit
+// RATE LIMITING
 // ----------------------------------------------------------------------------
 
 app.use(
   rateLimit({
     windowMs: 60_000,
     max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
   })
 );
 
 // ----------------------------------------------------------------------------
-// DB / Jobs / WS
+// INIT DB, JOBS, WS
 // ----------------------------------------------------------------------------
 
-initDB();
+await initDB(); // Ensure DB initialized before anything else
 autoStopExpiredContainers?.();
 initWebSocketServer(server);
 
@@ -130,7 +142,7 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/announcement", announcementRoutes);
 
 // ----------------------------------------------------------------------------
-// Static files
+// STATIC FILES
 // ----------------------------------------------------------------------------
 
 app.use(
@@ -142,7 +154,7 @@ app.use(
 );
 
 // ----------------------------------------------------------------------------
-// Download
+// FILE DOWNLOAD
 // ----------------------------------------------------------------------------
 
 app.get("/api/download/:file", (req, res) => {
@@ -157,24 +169,26 @@ app.get("/api/download/:file", (req, res) => {
 });
 
 // ----------------------------------------------------------------------------
-// Health
+// HEALTH CHECK
 // ----------------------------------------------------------------------------
 
 app.get("/api/health", (req, res) => {
-  res.json({ ok: true, time: new Date() });
+  res.json({ ok: true, time: new Date().toISOString() });
 });
 
 // ----------------------------------------------------------------------------
-// Error handler
+// GLOBAL ERROR HANDLER
 // ----------------------------------------------------------------------------
 
 app.use((err, req, res, next) => {
-  console.error("🔥 ERROR:", err);
-  res.status(500).json({ error: err.message || "Server error" });
+  console.error("🔥 GLOBAL ERROR:", err);
+  res.status(err.status || 500).json({
+    error: err.message || "Server error",
+  });
 });
 
 // ----------------------------------------------------------------------------
-// Start Server
+// START SERVER
 // ----------------------------------------------------------------------------
 
 server.listen(PORT, () => {

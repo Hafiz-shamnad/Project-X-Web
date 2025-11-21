@@ -5,13 +5,25 @@
 import prisma from "../config/db.js";
 
 /* -------------------------------------------------------------------------- */
+/*                               REQ USER HELPER                              */
+/* -------------------------------------------------------------------------- */
+
+function requireUser(req) {
+  if (!req.user?.id) {
+    const error = new Error("Unauthorized");
+    error.status = 401;
+    throw error;
+  }
+  return req.user.id;
+}
+
+/* -------------------------------------------------------------------------- */
 /*                        GET AUTHENTICATED PROFILE                            */
 /* -------------------------------------------------------------------------- */
 
 export async function getMyProfile(req, res) {
   try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const userId = requireUser(req);
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -26,7 +38,6 @@ export async function getMyProfile(req, res) {
 
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    /** Score calculation is based on challenge.points, not Solved.points */
     const totalPoints = user.solved.reduce(
       (sum, s) => sum + (s.challenge?.points ?? 0),
       0
@@ -41,10 +52,7 @@ export async function getMyProfile(req, res) {
       createdAt: user.createdAt,
 
       team: user.team
-        ? {
-            id: user.team.id,
-            name: user.team.name,
-          }
+        ? { id: user.team.id, name: user.team.name }
         : null,
 
       totalPoints,
@@ -60,7 +68,7 @@ export async function getMyProfile(req, res) {
     });
   } catch (err) {
     console.error("getMyProfile error:", err);
-    return res.status(500).json({ error: "Server error" });
+    return res.status(err.status || 500).json({ error: "Server error" });
   }
 }
 
@@ -71,7 +79,10 @@ export async function getMyProfile(req, res) {
 export async function getPublicProfile(req, res) {
   try {
     const { username } = req.params;
-    if (!username) return res.status(400).json({ error: "Invalid username" });
+
+    if (!username?.trim()) {
+      return res.status(400).json({ error: "Invalid username" });
+    }
 
     const user = await prisma.user.findUnique({
       where: { username },
@@ -96,9 +107,7 @@ export async function getPublicProfile(req, res) {
       bio: user.bio,
       country: user.country,
       avatarUrl: user.avatarUrl,
-
       team: user.team ? user.team.name : null,
-
       solveCount: user.solved.length,
       totalPoints,
     });
@@ -114,18 +123,20 @@ export async function getPublicProfile(req, res) {
 
 export async function updateMyProfile(req, res) {
   try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const userId = requireUser(req);
 
-    const { bio, country, avatarUrl } = req.body;
+    const { bio, country, avatarUrl } = req.body ?? {};
+
+    // Basic sanitization
+    const sanitized = {
+      bio: typeof bio === "string" ? bio.trim() : "",
+      country: typeof country === "string" ? country.trim() : "",
+      avatarUrl: typeof avatarUrl === "string" ? avatarUrl.trim() : "",
+    };
 
     const user = await prisma.user.update({
       where: { id: userId },
-      data: {
-        bio: bio ?? "",
-        country: country ?? "",
-        avatarUrl: avatarUrl ?? "",
-      },
+      data: sanitized,
       select: {
         id: true,
         username: true,

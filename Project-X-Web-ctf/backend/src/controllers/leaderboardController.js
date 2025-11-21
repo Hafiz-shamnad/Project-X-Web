@@ -1,5 +1,5 @@
 /**
- * Leaderboard Controller (ESM + Schema-Accurate + Optimized)
+ * Leaderboard Controller (ESM + Optimized + Cookie-Safe)
  */
 
 import prisma from "../config/db.js";
@@ -58,12 +58,16 @@ export async function getLeaderboard(req, res) {
 
 export async function getTeamLeaderboard(req, res) {
   try {
+    const now = new Date();
+
     const teams = await prisma.team.findMany({
       include: {
         members: {
           include: {
             solved: {
-              include: { challenge: { select: { id: true, points: true } } }
+              include: {
+                challenge: { select: { id: true, points: true } }
+              }
             }
           }
         },
@@ -73,24 +77,21 @@ export async function getTeamLeaderboard(req, res) {
       }
     });
 
-    const now = new Date();
-
     const leaderboard = teams
-      // Only show teams not under active ban
+      // Exclude actively banned teams
       .filter((t) => !t.bannedUntil || new Date(t.bannedUntil) <= now)
       .map((team) => {
-        // Member solves
         const memberSolves = team.members.flatMap((m) => m.solved);
-
-        // Team solves (rarely used, but schema supports it)
         const teamSolves = team.solved ?? [];
 
-        // Combine and dedupe
-        const allSolves = [...memberSolves, ...teamSolves];
+        const all = [...memberSolves, ...teamSolves];
 
+        // Deduplicate by challengeId (first timestamp wins)
         const unique = Array.from(
-          allSolves.reduce((map, s) => {
-            if (!map.has(s.challengeId)) map.set(s.challengeId, s);
+          all.reduce((map, solve) => {
+            if (!map.has(solve.challengeId)) {
+              map.set(solve.challengeId, solve);
+            }
             return map;
           }, new Map()).values()
         );
@@ -115,7 +116,7 @@ export async function getTeamLeaderboard(req, res) {
             challengeId: s.challengeId,
             points: s.challenge.points,
             createdAt: s.createdAt
-          })),
+          }))
         };
       })
       .sort((a, b) => b.score - a.score)
@@ -148,7 +149,9 @@ export async function getTeamMembersLeaderboard(req, res) {
         members: {
           include: {
             solved: {
-              include: { challenge: { select: { id: true, points: true } } }
+              include: {
+                challenge: { select: { id: true, points: true } }
+              }
             }
           }
         }
@@ -173,7 +176,7 @@ export async function getTeamMembersLeaderboard(req, res) {
             challengeId: s.challengeId,
             points: s.challenge.points,
             createdAt: s.createdAt
-          })),
+          }))
         };
       })
       .sort((a, b) => b.score - a.score)
@@ -196,5 +199,5 @@ export async function getTeamMembersLeaderboard(req, res) {
 export default {
   getLeaderboard,
   getTeamLeaderboard,
-  getTeamMembersLeaderboard,
+  getTeamMembersLeaderboard
 };

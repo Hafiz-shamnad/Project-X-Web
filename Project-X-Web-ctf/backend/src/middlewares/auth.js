@@ -4,25 +4,14 @@ import jwt from "jsonwebtoken";
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
 /**
- * Authenticate using:
- *  1) Authorization: Bearer <token>
- *  2) Fallback: cookie "token" (backward compatibility)
+ * Authenticate using ONLY cookie "token"
  */
 export function authenticate(req, res, next) {
   try {
-    const auth = req.headers?.authorization;
-    let token = null;
-
-    // Prefer header
-    if (auth && typeof auth === "string" && auth.startsWith("Bearer ")) {
-      token = auth.split(" ")[1];
-    } else {
-      // Fallback to cookie
-      token = req.cookies?.token || null;
-    }
+    const token = req.cookies?.token;
 
     if (!token) {
-      return res.status(401).json({ error: "Authentication token missing" });
+      return res.status(401).json({ error: "Authentication cookie missing" });
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);

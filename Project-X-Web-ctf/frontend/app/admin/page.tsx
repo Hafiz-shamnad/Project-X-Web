@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 import AdminHeader from "./components/AdminHeader";
 import AdminTabs from "./components/AdminTabs";
@@ -25,25 +25,31 @@ export default function AdminPanel() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const showSuccess = (msg: string) => {
+  /* ------------------------ Notifications ------------------------ */
+  const showSuccess = useCallback((msg: string) => {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(null), 2500);
-  };
+  }, []);
 
-  const showError = (msg: string) => {
+  const showError = useCallback((msg: string) => {
     setErrorMsg(msg);
     setTimeout(() => setErrorMsg(null), 3000);
-  };
+  }, []);
 
+  /* ------------------------ Modals (confirm/input) ------------------------ */
   const { confirm, input, openConfirm, openInput, closeConfirm, closeInput } =
     useAdminModals();
 
+  /* ------------------------ Data Hooks ------------------------ */
   const {
     challenges,
     fetchChallenges,
     createChallenge,
     deleteChallenge,
     toggleRelease,
+    bulkRelease,
+    bulkHide,
+    bulkDelete,
     loading: challengesLoading,
   } = useChallenges();
 
@@ -56,92 +62,17 @@ export default function AdminPanel() {
     loading: teamsLoading,
   } = useTeams();
 
+  /* ------------------------ Initial Load ------------------------ */
   useEffect(() => {
     fetchChallenges().catch(() => showError("Failed to load challenges"));
     fetchTeams().catch(() => showError("Failed to load teams"));
-  }, []);
+  }, [fetchChallenges, fetchTeams, showError]);
 
-  const AnnouncementPage = useMemo(
-    () => (
-      <AnnouncementCreate
-        onSuccess={() => showSuccess("Announcement created.")}
-        onError={() => showError("Failed to create announcement.")}
-      />
-    ),
-    []
-  );
-
-  const CreatePage = useMemo(
-    () => (
-      <ChallengeCreate
-        onCreate={async (fd) => {
-          try {
-            await createChallenge(fd);
-            showSuccess("Challenge created");
-          } catch {
-            showError("Failed");
-          }
-        }}
-      />
-    ),
-    [createChallenge]
-  );
-
-  const ManagePage = useMemo(
-    () => (
-      <ChallengeManage
-        challenges={challenges}
-        loading={challengesLoading}
-        onToggleRelease={async (id, current) => {
-          await toggleRelease(id, !current);
-          showSuccess(current ? "Hidden" : "Released");
-        }}
-        onDelete={(id, name) =>
-          openConfirm("Delete Challenge", `Delete "${name}"?`, async () => {
-            await deleteChallenge(id);
-            showSuccess("Deleted");
-          })
-        }
-        onBulkRelease={(ids) => Promise.resolve()}
-        onBulkHide={(ids) => Promise.resolve()}
-        onBulkDelete={(ids) => Promise.resolve()}
-        showSuccess={showSuccess}
-        showError={showError}
-      />
-    ),
-    [challenges, challengesLoading]
-  );
-
-  const TeamsPage = useMemo(
-    () => (
-      <TeamManager
-        teams={teams}
-        loading={teamsLoading}
-        openConfirm={openConfirm}
-        openInput={openInput}
-        onTemporaryBan={async (id, mins) => {
-          await banTeam(id, mins);
-          showSuccess("Temporary ban applied.");
-        }}
-        onPermanentBan={async (id) => {
-          await banTeam(id, 0);
-          showSuccess("Permanent ban applied.");
-        }}
-        onUnban={async (id) => {
-          await unbanTeam(id);
-          showSuccess("Team unbanned.");
-        }}
-        onPenalty={async (id, pts) => {
-          await applyPenalty(id, pts);
-          showSuccess("Penalty applied.");
-        }}
-      />
-    ),
-    [teams, teamsLoading]
-  );
+  /* ------------------------ Render ------------------------ */
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-gray-100">
+      {/* Toasts */}
       {(successMsg || errorMsg) && (
         <div
           className={`fixed top-6 right-6 px-6 py-4 rounded-lg shadow-xl backdrop-blur-md border
@@ -155,29 +86,109 @@ export default function AdminPanel() {
         </div>
       )}
 
-      <AdminHeader
-        challengeCount={challenges.length}
-        teamCount={teams.length}
-      />
+      <AdminHeader challengeCount={challenges.length} teamCount={teams.length} />
 
       <AdminTabs activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <main className="max-w-6xl mx-auto p-8 space-y-10">
-        {activeTab === "create" && CreatePage}
-        {activeTab === "manage" && ManagePage}
+        {/* CREATE TAB */}
+        {activeTab === "create" && (
+          <ChallengeCreate
+            onCreate={async (fd) => {
+              try {
+                await createChallenge(fd);
+                showSuccess("Challenge created");
+              } catch {
+                showError("Failed to create challenge");
+              }
+            }}
+          />
+        )}
+
+        {/* MANAGE TAB */}
+        {activeTab === "manage" && (
+          <ChallengeManage
+            challenges={challenges}
+            loading={challengesLoading}
+            // currentState = existing released value
+            onToggleRelease={async (id, currentState) => {
+              await toggleRelease(id, currentState);
+              showSuccess(currentState ? "Hidden" : "Released");
+            }}
+            onDelete={(id, name) =>
+              openConfirm(
+                "Delete Challenge",
+                `Delete "${name}"?`,
+                async () => {
+                  await deleteChallenge(id);
+                  showSuccess("Challenge deleted.");
+                },
+                "danger"
+              )
+            }
+            onBulkRelease={async (ids) => {
+              await bulkRelease(ids);
+              showSuccess("Selected challenges released.");
+            }}
+            onBulkHide={async (ids) => {
+              await bulkHide(ids);
+              showSuccess("Selected challenges hidden.");
+            }}
+            onBulkDelete={async (ids) => {
+              await bulkDelete(ids);
+              showSuccess("Selected challenges deleted.");
+            }}
+            showSuccess={showSuccess}
+            showError={showError}
+          />
+        )}
+
+        {/* TEAMS TAB */}
+        {activeTab === "teams" && (
+          <TeamManager
+            teams={teams}
+            loading={teamsLoading}
+            openConfirm={openConfirm}
+            openInput={openInput}
+            onTemporaryBan={async (id, mins) => {
+              await banTeam(id, mins);
+              showSuccess("Temporary ban applied.");
+            }}
+            onPermanentBan={async (id) => {
+              await banTeam(id, 0);
+              showSuccess("Permanent ban applied.");
+            }}
+            onUnban={async (id) => {
+              await unbanTeam(id);
+              showSuccess("Team unbanned.");
+            }}
+            onPenalty={async (id, pts) => {
+              await applyPenalty(id, pts);
+              showSuccess("Penalty applied.");
+            }}
+          />
+        )}
+
+        {/* ANNOUNCEMENT TAB */}
+        {activeTab === "announcement" && (
+          <AnnouncementCreate
+            onSuccess={() => showSuccess("Announcement created.")}
+            onError={() => showError("Failed to create announcement.")}
+          />
+        )}
+
+        {/* LEADERBOARD TAB */}
         {activeTab === "leaderboard" && <LeaderboardPanel />}
-        {activeTab === "teams" && TeamsPage}
-        {activeTab === "announcement" && AnnouncementPage}
       </main>
 
-      {/* Modals */}
+      {/* Confirm Modal */}
       <ConfirmModal
         isOpen={confirm.open}
         title={confirm.title}
         message={confirm.message}
+        variant={confirm.variant}
         confirmText="Confirm"
         cancelText="Cancel"
-        variant={confirm.variant} // ← ADD THIS
         onConfirm={async () => {
           await confirm.onConfirm();
           closeConfirm();
@@ -185,13 +196,14 @@ export default function AdminPanel() {
         onCancel={closeConfirm}
       />
 
+      {/* Input Modal */}
       <InputModal
         isOpen={input.open}
         title={input.title}
         message={input.message}
         label={input.label}
-        onConfirm={async (v) => {
-          await input.onConfirm(v);
+        onConfirm={async (val) => {
+          await input.onConfirm(val);
           closeInput();
         }}
         onCancel={closeInput}

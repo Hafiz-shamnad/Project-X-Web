@@ -436,11 +436,19 @@ export async function reduceTeamScore(req, res) {
       data: { penaltyPoints: updatedPenalty }
     });
 
+    /* -------------------------------------------------------------------
+     * NEW: WebSocket + Announcement creation
+     * ------------------------------------------------------------------- */
+    sendAnnouncement({
+      title: "Penalty Applied",
+      message: `A penalty of ${penalty} points was applied to team "${team.name}". Total penalty is now ${updatedPenalty} points.`,
+    });
+
     return res.json({
       ok: true,
       message: `Penalty applied: ${penalty}. Total penalty: ${updatedPenalty}`,
       rawScore,
-      finalScore
+      finalScore,
     });
   } catch (err) {
     console.error("Penalty error:", err);
@@ -449,6 +457,120 @@ export async function reduceTeamScore(req, res) {
     });
   }
 }
+
+
+/* ========================================================================== */
+/*                               BULK RELEASE                                  */
+/* ========================================================================== */
+
+export async function bulkRelease(req, res) {
+  try {
+    assertAdmin(req);
+
+    const ids = req.body?.ids;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "Missing or invalid IDs" });
+    }
+
+    await prisma.challenge.updateMany({
+      where: { id: { in: ids } },
+      data: { released: true }
+    });
+
+    sendAnnouncement({
+      title: "Bulk Release",
+      message: `${ids.length} challenges have been released.`,
+    });
+
+    return res.json({ ok: true, released: ids.length });
+  } catch (err) {
+    console.error("Bulk release error:", err);
+    return res.status(err.status || 500).json({
+      error: "Failed to bulk release challenges",
+    });
+  }
+}
+
+/* ========================================================================== */
+/*                               BULK HIDE                                     */
+/* ========================================================================== */
+
+export async function bulkHide(req, res) {
+  try {
+    assertAdmin(req);
+
+    const ids = req.body?.ids;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "Missing or invalid IDs" });
+    }
+
+    await prisma.challenge.updateMany({
+      where: { id: { in: ids } },
+      data: { released: false }
+    });
+
+    sendAnnouncement({
+      title: "Bulk Hide",
+      message: `${ids.length} challenges have been hidden.`,
+    });
+
+    return res.json({ ok: true, hidden: ids.length });
+  } catch (err) {
+    console.error("Bulk hide error:", err);
+    return res.status(err.status || 500).json({
+      error: "Failed to bulk hide challenges",
+    });
+  }
+}
+
+/* ========================================================================== */
+/*                               BULK DELETE                                   */
+/* ========================================================================== */
+
+export async function bulkDelete(req, res) {
+  try {
+    assertAdmin(req);
+
+    const ids = req.body?.ids;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "Missing or invalid IDs" });
+    }
+
+    // get file paths first (cleanup)
+    const files = await prisma.challenge.findMany({
+      where: { id: { in: ids } },
+      select: { filePath: true }
+    });
+
+    await prisma.challenge.deleteMany({
+      where: { id: { in: ids } }
+    });
+
+    // remove files if exist
+    for (const file of files) {
+      if (file.filePath && fs.existsSync(file.filePath)) {
+        try {
+          await fs.promises.unlink(file.filePath);
+        } catch (err) {
+          console.error("File delete error:", err);
+        }
+      }
+    }
+
+    sendAnnouncement({
+      title: "Bulk Delete",
+      message: `${ids.length} challenges were deleted.`,
+    });
+
+    return res.json({ ok: true, deleted: ids.length });
+  } catch (err) {
+    console.error("Bulk delete error:", err);
+    return res.status(err.status || 500).json({
+      error: "Failed to bulk delete challenges",
+    });
+  }
+}
+
 
 export default {
   createChallenge,
@@ -459,5 +581,8 @@ export default {
   getAllTeams,
   banTeam,
   unbanTeam,
-  reduceTeamScore
+  reduceTeamScore,
+  bulkRelease,
+  bulkHide,
+  bulkDelete
 };

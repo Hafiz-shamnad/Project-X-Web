@@ -35,10 +35,7 @@ export function useChallenges({ teamId }: UseChallengesParams) {
     if (!teamId) return [];
 
     try {
-      const data = await apiFetch(`/team/${teamId}/solves`, {
-        auth: true,
-      });
-
+      const data = await apiFetch(`/team/${teamId}/solves`);
       return (
         data?.solved?.map((s: { challengeId: number }) => s.challengeId) ?? []
       );

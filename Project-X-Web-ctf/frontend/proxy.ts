@@ -2,27 +2,30 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * BEST PRACTICE:
- * Only protect /admin on server side.
- * Dashboard/CTF/Login handled by client-side with useUser().
+ * Admin-only protection layer.
+ * This runs server-side only for Next.js and protects /admin pages.
+ * 
+ * NOTE:
+ * - This is NOT middleware.
+ * - This is a proxy function you manually call in pages or routes.
+ * - Node APIs (Buffer) are allowed.
  */
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // 🔐 Only protect /admin using cookie token (optional)
+  // Protect only /admin pages
   if (pathname.startsWith("/admin")) {
     const token = req.cookies.get("token")?.value;
 
-    // If no cookie token → redirect
     if (!token) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
-    // Attempt decode for admin role (optional)
     try {
-      const payload = token.split(".")[1];
+      // Decode JWT payload (Node backend signed it, so safe to decode)
+      const [, payloadBase64] = token.split(".");
       const json = JSON.parse(
-        Buffer.from(payload, "base64").toString("utf-8")
+        Buffer.from(payloadBase64, "base64").toString("utf8")
       );
 
       if (json.role !== "admin") {
@@ -33,13 +36,10 @@ export function proxy(req: NextRequest) {
     }
   }
 
-  // ⭐ Allow: dashboard, ctf, login, register, homepage
+  // Allow everything else
   return NextResponse.next();
 }
 
-/**
- * Apply proxy ONLY to admin path.
- */
 export const config = {
   matcher: ["/admin/:path*"],
 };

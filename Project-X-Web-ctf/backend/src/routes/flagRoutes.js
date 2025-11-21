@@ -1,8 +1,8 @@
 /**
- * Flag Submission Routes (ESM + Secure)
- * -------------------------------------
+ * Flag Submission Routes (ESM + Secure + Cookie Auth)
+ * ---------------------------------------------------
  * Handles:
- *  - User flag submissions for challenges
+ *   - User flag submissions for challenges
  */
 
 import express from "express";
@@ -15,8 +15,8 @@ const router = express.Router();
  * Submit a flag for a challenge
  * POST /api/flag/submit
  * Requires:
- *   - Bearer token
- *   - req.body: { challengeId, flag }
+ *   - Valid cookie-based JWT (authenticate)
+ *   - Body: { challengeId, flag }
  */
 router.post("/submit", authenticate, submitFlag);
 

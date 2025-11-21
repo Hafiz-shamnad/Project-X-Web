@@ -6,15 +6,24 @@ import prisma from "../config/db.js";
 import { broadcast } from "../lib/ws/ws.js";
 
 /* -------------------------------------------------------------------------- */
-/*                               Create Announcement                           */
+/*                                  Helpers                                   */
+/* -------------------------------------------------------------------------- */
+
+function assertAdmin(req) {
+  if (!req.user || req.user.role !== "admin") {
+    const error = new Error("Admin only");
+    error.status = 403;
+    throw error;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              Create Announcement                            */
 /* -------------------------------------------------------------------------- */
 
 export async function createAnnouncement(req, res) {
   try {
-    // 🔒 Admin-only action
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ error: "Admin only" });
-    }
+    assertAdmin(req);
 
     const title = req.body.title?.trim();
     const message = req.body.message?.trim();
@@ -27,7 +36,7 @@ export async function createAnnouncement(req, res) {
       data: { title, message },
     });
 
-    // WS should never block API
+    // WS should never block API flow
     try {
       broadcast({
         type: "announcement",
@@ -36,19 +45,21 @@ export async function createAnnouncement(req, res) {
         message: ann.message,
         createdAt: ann.createdAt,
       });
-    } catch (e) {
-      console.error("WS broadcast failed:", e);
+    } catch (err) {
+      console.error("WS broadcast failed:", err);
     }
 
     return res.json(ann);
   } catch (err) {
     console.error("Create announcement error:", err);
-    return res.status(500).json({ error: "Failed to create announcement" });
+    return res.status(err.status || 500).json({
+      error: err.status === 403 ? "Admin only" : "Failed to create announcement",
+    });
   }
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                Get All Announcements                        */
+/*                             Get All Announcements                           */
 /* -------------------------------------------------------------------------- */
 
 export async function getAnnouncements(req, res) {
@@ -65,7 +76,7 @@ export async function getAnnouncements(req, res) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                    Mark Read                               */
+/*                                   Mark Read                                */
 /* -------------------------------------------------------------------------- */
 
 export async function markRead(req, res) {
@@ -77,13 +88,14 @@ export async function markRead(req, res) {
       return res.status(400).json({ error: "Invalid announcement ID" });
     }
 
-    // Ensure announcement exists
     const exists = await prisma.announcement.findUnique({
       where: { id: announcementId },
-      select: { id: true }
+      select: { id: true },
     });
 
-    if (!exists) return res.status(404).json({ error: "Announcement not found" });
+    if (!exists) {
+      return res.status(404).json({ error: "Announcement not found" });
+    }
 
     await prisma.announcementRead.upsert({
       where: { announcementId_userId: { announcementId, userId } },
@@ -99,7 +111,7 @@ export async function markRead(req, res) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                 Unread Count                                */
+/*                                 Unread Count                               */
 /* -------------------------------------------------------------------------- */
 
 export async function unreadCount(req, res) {
@@ -109,9 +121,7 @@ export async function unreadCount(req, res) {
     const unread = await prisma.announcement.count({
       where: {
         reads: {
-          none: {
-            userId: userId
-          }
+          none: { userId }
         }
       }
     });

@@ -6,11 +6,11 @@ export const TeamService = {
     return apiClient("/admin/teams");
   },
 
-  /** Temporary ban (duration in minutes) */
+  /** Temporary / permanent ban */
   ban(id: number, durationMinutes: number) {
     return apiClient(`/admin/team/${id}/ban`, {
       method: "POST",
-      body: JSON.stringify({ durationMinutes }),
+      json: { durationMinutes },   // ✅ correct key, correct format
     });
   },
 
@@ -21,11 +21,11 @@ export const TeamService = {
     });
   },
 
-  /** Apply penalty (deduct points) */
+  /** Apply penalty */
   penalty(id: number, points: number) {
     return apiClient(`/admin/team/${id}/penalty`, {
       method: "POST",
-      body: JSON.stringify({ penalty: points }),
+      json: { penalty: points },  // ✅ backend expects "penalty"
     });
   },
 };

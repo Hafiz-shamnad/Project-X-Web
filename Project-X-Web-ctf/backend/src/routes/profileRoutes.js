@@ -1,10 +1,6 @@
 /**
  * Profile Routes (ESM + Secure + Optimized)
  * -----------------------------------------
- * Handles:
- *  - Authenticated user's profile
- *  - Profile updates
- *  - Public profile pages
  */
 
 import express from "express";
@@ -18,20 +14,23 @@ import {
 
 const router = express.Router();
 
-/* ============================
-   AUTHENTICATED PROFILE ACTIONS
-   ============================ */
+/* --------------------------------------------------------------------------
+   AUTHENTICATED USER PROFILE
+   -------------------------------------------------------------------------- */
+
+// All `/me` endpoints require authentication
 router.use("/me", authenticate);
 
-/** My profile */
+/** Get authenticated user's profile */
 router.get("/me", getMyProfile);
 
-/** Update my profile */
+/** Update authenticated user's profile */
 router.put("/me", updateMyProfile);
 
-/* ============================
-   PUBLIC PROFILE LOOKUP
-   ============================ */
+/* --------------------------------------------------------------------------
+   PUBLIC USER PROFILE (must stay last so it doesn’t override /me)
+   -------------------------------------------------------------------------- */
+
 /** Public profile by username */
 router.get("/:username", getPublicProfile);
 

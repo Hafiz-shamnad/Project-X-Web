@@ -1,33 +1,14 @@
 /**
- * API Client (JWT Bearer + JSON + File Upload + Production Ready)
+ * API Client (Cookie Auth + JSON + File Upload + CORS Safe)
  */
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-/* ----------------------------------------------
- * Token Helpers (Browser Safe)
- * ---------------------------------------------- */
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return localStorage.getItem("token");
-  } catch {
-    return null;
-  }
-}
-
-/* ----------------------------------------------
- * Types
- * ---------------------------------------------- */
 interface ApiOptions extends RequestInit {
-  auth?: boolean;  // attach Authorization token (default: true)
-  json?: any;      // JSON body
-  form?: FormData; // file upload
+  json?: any;       // JSON body
+  form?: FormData;  // Multipart body
 }
 
-/* ----------------------------------------------
- * Main API Function
- * ---------------------------------------------- */
 export async function apiFetch<T = any>(
   endpoint: string,
   options: ApiOptions = {}
@@ -38,112 +19,99 @@ export async function apiFetch<T = any>(
   }
 
   const url = `${API_URL}${endpoint}`;
-  const token = getToken();
 
   /* ----------------------------------------------
-   * Build Headers
+   * BUILD HEADERS (BUT NO AUTHORIZATION)
    * ---------------------------------------------- */
   const headers: Record<string, string> = {
     Accept: "application/json",
   };
 
-  // Copy custom headers
+  // Merge custom headers
   if (options.headers instanceof Headers) {
-    options.headers.forEach((v, k) => (headers[k] = v));
-  } else if (options.headers && typeof options.headers === "object") {
-    for (const [k, v] of Object.entries(options.headers)) {
-      if (typeof v === "string") headers[k] = v;
+    options.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+  } else if (options.headers) {
+    for (const [key, value] of Object.entries(options.headers)) {
+      if (typeof value === "string") {
+        headers[key] = value;
+      }
     }
   }
 
+  // 💥 IMPORTANT: STRIP Authorization FOR COOKIE-ONLY AUTH
+  delete headers["authorization"];
+  delete headers["Authorization"];
+
   /* ----------------------------------------------
-   * Attach Bearer Token (unless disabled)
+   * JSON BODY
    * ---------------------------------------------- */
-  // Attach Bearer token
-  if (options.auth !== false) {
-    const token = getToken();
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-  }
   let body: BodyInit | undefined;
 
-  /* ----------------------------------------------
-   * JSON Body
-   * ---------------------------------------------- */
-  if (options.json) {
+  if (options.json !== undefined) {
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(options.json);
   }
 
   /* ----------------------------------------------
-   * FormData Body
+   * FORM DATA (Browser sets boundary)
    * ---------------------------------------------- */
   if (options.form) {
     body = options.form;
-    // IMPORTANT: Do NOT set Content-Type (browser sets it automatically)
     delete headers["Content-Type"];
   }
 
   /* ----------------------------------------------
-   * Final Request
+   * FINAL FETCH (COOKIE MODE)
    * ---------------------------------------------- */
   const req: RequestInit = {
     method: options.method || "GET",
     headers,
     body,
-    credentials: "omit", // since you use pure Bearer token
+    credentials: "include",  // ⬅ REQUIRED for cookies
     mode: "cors",
   };
 
-  /* ----------------------------------------------
-   * Execute Request
-   * ---------------------------------------------- */
   let res: Response;
 
   try {
     res = await fetch(url, req);
-  } catch (error: any) {
-    throw new Error(`🌐 Network error: ${error.message}`);
+  } catch (err: any) {
+    throw new Error(`🌐 Network error: ${err.message}`);
   }
 
-  // successful "no content"
+  // No content
   if (res.status === 204) return null as T;
 
-  // Parse JSON safely
+  // Try parse JSON
   let data: any;
   try {
     data = await res.json();
   } catch {
-    throw new Error("❌ Server returned invalid JSON.");
+    throw new Error("❌ Backend returned invalid JSON.");
   }
 
   /* ----------------------------------------------
-   * Auto 401 Handling
+   *  AUTO-REDIRECT ON 401
    * ---------------------------------------------- */
   if (res.status === 401) {
     if (typeof window !== "undefined") {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      console.warn("⚠ User unauthorized — redirecting to /login");
       window.location.href = "/login";
     }
     throw new Error("Unauthorized");
   }
 
   /* ----------------------------------------------
-   * Handle Errors
+   * HANDLE ERRORS CLEANLY
    * ---------------------------------------------- */
   if (!res.ok) {
-    throw new Error(
-      data?.error ||
-      data?.message ||
-      `Request failed with status ${res.status}`
-    );
+    throw new Error(data?.error || data?.message || "Request failed");
   }
 
   return data as T;
 }
 
-/* Aliases */
 export const api = apiFetch;
 export const apiClient = apiFetch;

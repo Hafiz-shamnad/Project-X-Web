@@ -9,6 +9,19 @@ const FIRST_SOLVER_BONUS = 0.5;
 const POINT_DECAY = 0.05;
 
 /* -------------------------------------------------------------------------- */
+/*                           AUTH HELPER (Cookie Based)                       */
+/* -------------------------------------------------------------------------- */
+
+function requireUser(req) {
+  if (!req.user?.id) {
+    const error = new Error("Unauthorized");
+    error.status = 401;
+    throw error;
+  }
+  return req.user.id;
+}
+
+/* -------------------------------------------------------------------------- */
 /*                       TEAM BAN VALIDATION HELPER                           */
 /* -------------------------------------------------------------------------- */
 
@@ -25,7 +38,7 @@ async function checkTeamBan(teamId) {
   const until = new Date(team.bannedUntil);
   const now = new Date();
 
-  // Permanent ban (9999 date)
+  // Permanent ban
   if (until.getFullYear() === 9999) {
     return {
       blocked: true,
@@ -37,6 +50,7 @@ async function checkTeamBan(teamId) {
     };
   }
 
+  // Still banned
   if (until > now) {
     const minutes = Math.ceil((until - now) / 60000);
     return {
@@ -46,12 +60,12 @@ async function checkTeamBan(teamId) {
         permanent: false,
         bannedUntil: until,
         remainingMinutes: minutes,
-        message: `Team banned for ${minutes} more minutes`
+        message: `Team banned for ${minutes} more minute(s)`
       }
     };
   }
 
-  // expired → auto-unban
+  // Ban expired → auto-unban
   await prisma.team.update({
     where: { id: teamId },
     data: { bannedUntil: null }
@@ -66,14 +80,22 @@ async function checkTeamBan(teamId) {
 
 export async function submitFlag(req, res) {
   try {
-    const userId = req.user?.id; // 🔒 SECURE: Always authenticated user
+    const userId = requireUser(req);
+
     const { challengeId, flag } = req.body;
 
-    if (!userId || !challengeId || !flag) {
-      return res.status(400).json({ error: "Missing fields" });
+    if (!challengeId || !flag) {
+      return res.status(400).json({ error: "challengeId and flag are required" });
     }
 
     const cid = Number(challengeId);
+    if (isNaN(cid)) {
+      return res.status(400).json({ error: "Invalid challenge ID" });
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Fetch User (teamId required for scoring)                                */
+    /* ---------------------------------------------------------------------- */
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -83,14 +105,16 @@ export async function submitFlag(req, res) {
     if (!user) return res.status(404).json({ error: "User not found" });
 
     /* ---------------------------------------------------------------------- */
-    /* Ban Check                                                              */
+    /* Team Ban Check                                                         */
     /* ---------------------------------------------------------------------- */
 
     const banCheck = await checkTeamBan(user.teamId);
-    if (banCheck.blocked) return res.status(403).json(banCheck.response);
+    if (banCheck.blocked) {
+      return res.status(403).json(banCheck.response);
+    }
 
     /* ---------------------------------------------------------------------- */
-    /* Fetch Challenge                                                        */
+    /* Fetch Challenge                                                         */
     /* ---------------------------------------------------------------------- */
 
     const challenge = await prisma.challenge.findUnique({
@@ -107,34 +131,36 @@ export async function submitFlag(req, res) {
     }
 
     /* ---------------------------------------------------------------------- */
-    /* Prevent Duplicate Solve                                                */
+    /* Prevent Duplicate Solve                                                 */
     /* ---------------------------------------------------------------------- */
 
     const existingSolve = await prisma.solved.findFirst({
       where: {
         OR: [
-          { userId: user.id, challengeId: cid },
+          { userId, challengeId: cid },
           user.teamId ? { teamId: user.teamId, challengeId: cid } : undefined
         ].filter(Boolean)
       }
     });
 
     if (existingSolve) {
-      return res.json({ status: "already_solved", message: "Already solved" });
+      return res.json({
+        status: "already_solved",
+        message: "You or your team has already solved this challenge"
+      });
     }
 
     /* ---------------------------------------------------------------------- */
-    /* Validate Flag                                                          */
+    /* Validate Flag                                                           */
     /* ---------------------------------------------------------------------- */
 
     const correct = hashFlag(flag) === challenge.flagHash;
 
-    // Log every submission
     await prisma.attempt.create({
       data: {
-        userId: user.id,
+        userId,
         challengeId: cid,
-        ip: req.ip,
+        ip: req.headers["x-forwarded-for"]?.split(",")[0] || req.ip,
         correct
       }
     });
@@ -144,7 +170,7 @@ export async function submitFlag(req, res) {
     }
 
     /* ---------------------------------------------------------------------- */
-    /* Dynamic Scoring                                                        */
+    /* Dynamic Scoring                                                         */
     /* ---------------------------------------------------------------------- */
 
     const solveCount = await prisma.solved.count({
@@ -154,18 +180,21 @@ export async function submitFlag(req, res) {
     let awarded = challenge.points;
 
     if (solveCount === 0) {
-      // First blood
+      // First blood bonus
       awarded = Math.ceil(awarded * (1 + FIRST_SOLVER_BONUS));
     } else {
-      // Score decay
+      // Decay formula
       const decay = Math.max(0, 1 - POINT_DECAY * solveCount);
       awarded = Math.max(10, Math.ceil(awarded * decay));
     }
 
-    // Record Solve
+    /* ---------------------------------------------------------------------- */
+    /* Record Solve                                                            */
+    /* ---------------------------------------------------------------------- */
+
     await prisma.solved.create({
       data: {
-        userId: user.id,
+        userId,
         teamId: user.teamId,
         challengeId: cid,
         points: awarded
@@ -176,9 +205,12 @@ export async function submitFlag(req, res) {
       status: "correct",
       pointsAwarded: awarded
     });
+
   } catch (err) {
     console.error("Flag submit error:", err);
-    return res.status(500).json({ error: "Server error submitting flag" });
+    return res.status(err.status || 500).json({
+      error: "Server error submitting flag"
+    });
   }
 }
 

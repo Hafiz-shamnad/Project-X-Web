@@ -103,10 +103,10 @@ export default function Navbar() {
   }, []);
 
   /* -------------------------------------------------------
-   * Unread Announcements + WebSocket
+   * Unread Announcements + WebSocket Listener
    * ------------------------------------------------------- */
   useEffect(() => {
-    // Load unread count
+    // Step 1 — Load unread announcements count
     fetch(`${BACKEND_URL}/announcement/unread`, {
       credentials: "include",
     })
@@ -114,13 +114,50 @@ export default function Navbar() {
       .then((d) => setUnread(d.unread || 0))
       .catch(() => {});
 
-    // WebSocket listener
+    /* -------------------------------------------------------
+     * Step 2 — Build WS URL
+     * ------------------------------------------------------- */
     const wsUrl = BACKEND_URL.replace(/^http/, "ws") // http → ws
       .replace(/^https/, "wss") // https → wss
-      .replace(/\/api$/, ""); // remove /api only at end
+      .replace(/\/api$/, ""); // remove trailing /api
 
-    const ws = new WebSocket(`${wsUrl}/ws`);
+    /* -------------------------------------------------------
+     * Step 3 — Read wsToken cookie (not httpOnly)
+     * ------------------------------------------------------- */
+    function getCookie(name: string) {
+      return document.cookie
+        .split("; ")
+        .find((row) => row.startsWith(name + "="))
+        ?.split("=")[1];
+    }
 
+    const wsToken = getCookie("wsToken");
+
+    if (!wsToken) {
+      console.warn("❗ WS token missing — WebSocket not connecting.");
+      return;
+    }
+
+    /* -------------------------------------------------------
+     * Step 4 — Connect with token
+     * ------------------------------------------------------- */
+    const ws = new WebSocket(`${wsUrl}/ws?token=${wsToken}`);
+
+    ws.onopen = () => {
+      console.log("🔌 WS connected.");
+    };
+
+    ws.onerror = (err) => {
+      console.error("❌ WS Error:", err);
+    };
+
+    ws.onclose = () => {
+      console.warn("⚠️ WS closed.");
+    };
+
+    /* -------------------------------------------------------
+     * Step 5 — Handle incoming messages
+     * ------------------------------------------------------- */
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -136,7 +173,9 @@ export default function Navbar() {
     return () => ws.close();
   }, []);
 
-  // Reset unread when user opens panel
+  /* -------------------------------------------------------
+   * Reset unread when panel opens
+   * ------------------------------------------------------- */
   useEffect(() => {
     if (openAnnouncements) {
       setUnread(0);
