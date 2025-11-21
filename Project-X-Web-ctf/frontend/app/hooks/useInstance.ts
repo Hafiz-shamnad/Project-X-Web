@@ -1,13 +1,10 @@
-// app/projectx/hooks/useInstance.ts
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "../lib/api";
 import type { Challenge } from "../types/Challenge";
 import { formatTime } from "../utils/formatTime";
 import toast from "react-hot-toast";
-
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
 interface InstanceInfo {
   port: number;
@@ -32,15 +29,9 @@ export function useInstance(selectedChallenge: Challenge | null) {
 
     const fetchInstance = async () => {
       try {
-        const res = await fetch(
-          `${BACKEND_URL}/challenges/instance/${selectedChallenge.id}?t=${Date.now()}`,
-          {
-            credentials: "include",
-            cache: "no-store",
-          }
+        const data = await apiFetch(
+          `/challenges/instance/${selectedChallenge.id}?t=${Date.now()}`
         );
-
-        const data = await res.json();
 
         if (data.status === "running") {
           setInstance({
@@ -53,6 +44,7 @@ export function useInstance(selectedChallenge: Challenge | null) {
             0,
             Math.floor((new Date(data.expiresAt).getTime() - Date.now()) / 1000)
           );
+
           setRemainingSeconds(diff);
         } else {
           setInstance(null);
@@ -90,17 +82,11 @@ export function useInstance(selectedChallenge: Challenge | null) {
    * ---------------------------------------------------------- */
   const spawn = async (challengeId: number) => {
     setSpawnLoading(true);
-    try {
-      const res = await fetch(
-        `${BACKEND_URL}/challenges/spawn/${challengeId}`,
-        {
-          method: "POST",
-          credentials: "include",
-          cache: "no-store",
-        }
-      );
 
-      const data = await res.json();
+    try {
+      const data = await apiFetch(`/challenges/spawn/${challengeId}`, {
+        method: "POST",
+      });
 
       if (data.status === "created" || data.status === "running") {
         setInstance({
@@ -111,7 +97,9 @@ export function useInstance(selectedChallenge: Challenge | null) {
 
         const diff = Math.max(
           0,
-          Math.floor((new Date(data.expiresAt).getTime() - Date.now()) / 1000)
+          Math.floor(
+            (new Date(data.expiresAt).getTime() - Date.now()) / 1000
+          )
         );
         setRemainingSeconds(diff);
 
@@ -127,56 +115,43 @@ export function useInstance(selectedChallenge: Challenge | null) {
     }
   };
 
-/* ----------------------------------------------------------
- * Stop environment (Optimistic UI)
- * ---------------------------------------------------------- */
-const stop = async (challengeId: number, opts?: { immediate?: boolean }) => {
-  // ⚡ Instantly update UI BEFORE calling the backend
-  if (opts?.immediate) {
-    setInstance(null);
-    setRemainingSeconds(null);
-    return;
-  }
-
-  // Backend call in background
-  try {
-    const res = await fetch(
-      `${BACKEND_URL}/challenges/stop/${challengeId}`,
-      {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-      }
-    );
-
-    const data = await res.json();
-
-    if (data.status === "destroyed") {
-      toast.success("Environment stopped successfully!");
-    } else {
-      toast("Environment already stopped.");
+  /* ----------------------------------------------------------
+   * Stop environment (Optimistic UI)
+   * ---------------------------------------------------------- */
+  const stop = async (challengeId: number, opts?: { immediate?: boolean }) => {
+    if (opts?.immediate) {
+      setInstance(null);
+      setRemainingSeconds(null);
+      return;
     }
-  } catch (err) {
-    console.error(err);
-    toast.error("Failed to stop environment");
-  } finally {
-    setInstance(null);
-    setRemainingSeconds(null);
-  }
-};
 
+    try {
+      const data = await apiFetch(`/challenges/stop/${challengeId}`, {
+        method: "POST",
+      });
+
+      if (data.status === "destroyed") {
+        toast.success("Environment stopped successfully!");
+      } else {
+        toast("Environment already stopped.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to stop environment");
+    } finally {
+      setInstance(null);
+      setRemainingSeconds(null);
+    }
+  };
 
   /* ----------------------------------------------------------
    * Extend expiry by +30 mins
    * ---------------------------------------------------------- */
   const extend = async (challengeId: number): Promise<boolean> => {
     try {
-      const res = await fetch(
-        `${BACKEND_URL}/challenges/extend/${challengeId}`,
-        { method: "POST", credentials: "include" }
-      );
-
-      const data = await res.json();
+      const data = await apiFetch(`/challenges/extend/${challengeId}`, {
+        method: "POST",
+      });
 
       if (data.status === "max_reached") {
         toast.error("Maximum allowed time (60 minutes) reached");
@@ -197,6 +172,7 @@ const stop = async (challengeId: number, opts?: { immediate?: boolean }) => {
             (new Date(data.expiresAt).getTime() - Date.now()) / 1000
           )
         );
+
         setRemainingSeconds(diff);
         return true;
       }

@@ -1,10 +1,10 @@
 /**
- * User Controller (ESM + Optimized)
- * ---------------------------------
+ * User Controller (ESM + Secured + Optimized)
+ * -------------------------------------------
  * Handles:
  *  - Creating a user if not exists
  *  - Fetching a user with solve history
- *  - Toggling a solve entry
+ *  - Toggling a solve entry (authenticated)
  */
 
 import prisma from "../config/db.js";
@@ -13,10 +13,6 @@ import prisma from "../config/db.js";
 /*                       Create or Fetch Existing User                         */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Create a new user if they do not exist, otherwise return existing user.
- * POST /api/user
- */
 export async function createOrGetUser(req, res) {
   const { username } = req.body;
 
@@ -25,13 +21,11 @@ export async function createOrGetUser(req, res) {
   }
 
   try {
-    // Fast fetch (indexed field)
     let user = await prisma.user.findUnique({
       where: { username },
       select: { id: true, username: true, createdAt: true },
     });
 
-    // Create if missing
     if (!user) {
       user = await prisma.user.create({
         data: { username },
@@ -50,10 +44,6 @@ export async function createOrGetUser(req, res) {
 /*                               Get User Profile                              */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Fetch a public user profile including solved challenges.
- * GET /api/user/:username
- */
 export async function getUser(req, res) {
   const { username } = req.params;
 
@@ -72,7 +62,6 @@ export async function getUser(req, res) {
       },
     });
 
-    // Return empty if user not found (keeps UI consistent)
     if (!user) {
       return res.json({
         id: null,
@@ -96,34 +85,29 @@ export async function getUser(req, res) {
 /*                                 Toggle Solve                                */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Toggle solved status for a user on a challenge.
- * POST /api/user/toggle-solve
- */
 export async function toggleSolve(req, res) {
-  const { username, challengeId } = req.body;
+  const { challengeId } = req.body;
 
-  if (!username || !challengeId) {
+  // 🔒 Always use authenticated user
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(401).json({
+      error: "Unauthorized: Missing user from token",
+    });
+  }
+
+  if (!challengeId) {
     return res.status(400).json({
-      error: "username and challengeId required",
+      error: "challengeId is required",
     });
   }
 
   try {
-    // Fetch user fast
-    const user = await prisma.user.findUnique({
-      where: { username },
-      select: { id: true },
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
     const cId = Number(challengeId);
 
     const existing = await prisma.solved.findFirst({
-      where: { userId: user.id, challengeId: cId },
+      where: { userId, challengeId: cId },
       select: { id: true },
     });
 
@@ -137,9 +121,9 @@ export async function toggleSolve(req, res) {
       });
     }
 
-    // Otherwise create solve
+    // Else create solve
     const solve = await prisma.solved.create({
-      data: { userId: user.id, challengeId: cId },
+      data: { userId, challengeId: cId },
     });
 
     return res.json({

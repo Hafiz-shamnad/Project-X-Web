@@ -1,6 +1,6 @@
 /**
- * Team Routes (ESM)
- * -----------------
+ * Team Routes (ESM + Secure + Optimized)
+ * --------------------------------------
  */
 
 import express from "express";
@@ -15,24 +15,21 @@ import {
 
 const router = express.Router();
 
-/**
- * Authenticated user's team
- */
-router.get("/me", authenticate, getMyTeam);
+/* =====================================================
+   AUTHENTICATED TEAM OPERATIONS
+   ===================================================== */
+router.use(authenticate);
 
-/**
- * Create team
- */
-router.post("/create", authenticate, createTeam);
+/** Get authenticated user's team */
+router.get("/me", getMyTeam);
 
-/**
- * Join team
- */
-router.post("/join", authenticate, joinTeam);
+/** Create a team */
+router.post("/create", createTeam);
 
-/**
- * Team solves history
- */
-router.get("/:id/solves", authenticate, getTeamSolves);
+/** Join a team */
+router.post("/join", joinTeam);
+
+/** Get solves of team by ID */
+router.get("/:id/solves", getTeamSolves);
 
 export default router;

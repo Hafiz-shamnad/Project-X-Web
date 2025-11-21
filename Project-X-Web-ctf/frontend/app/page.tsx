@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { apiFetch } from '@/lib/api';
-import { useRouter } from 'next/navigation';
+import { useEffect } from "react";
+import { apiFetch } from "@/app/lib/api";
+import { useRouter } from "next/navigation";
 
 /**
  * Root page:
@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
  * - Works entirely on the client to avoid Next.js caching issues
  */
 export default function Home() {
+  
   const router = useRouter();
 
   useEffect(() => {
@@ -18,19 +19,19 @@ export default function Home() {
 
     async function checkAuth() {
       try {
-        const res = await apiFetch('/auth/me');
+        const res = await apiFetch("/auth/me");
 
         // Prevent redirect after component unmount
         if (!isMounted) return;
 
         if (res && !res.error) {
-          router.replace('/dashboard');
+          router.replace("/dashboard");
         } else {
-          router.replace('/login');
+          router.replace("/login");
         }
       } catch (err) {
-        console.error('Authentication check failed:', err);
-        router.replace('/login');
+        console.error("Authentication check failed:", err);
+        router.replace("/login");
       }
     }
 

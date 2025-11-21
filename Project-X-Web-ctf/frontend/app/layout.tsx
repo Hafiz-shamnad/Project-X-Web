@@ -15,6 +15,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* React DevTools standalone */}
+        <Script
+          src="http://localhost:8097"
+          strategy="beforeInteractive"
+        />
+      </head>
+
       <body className="font-mono">
         <NavbarWrapper /> 
         {children}

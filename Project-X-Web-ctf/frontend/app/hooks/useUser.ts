@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "../lib/api";
 
 export interface UserProfile {
+  id?: number;
   username: string;
   teamId: number | null;
   bannedUntil: string | null;
+  role?: string;
 }
 
 interface UserState {
@@ -14,9 +17,6 @@ interface UserState {
   isTempBanned: boolean;
   isPermanentBanned: boolean;
 }
-
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
 export function useUser() {
   const [state, setState] = useState<UserState>({
@@ -29,16 +29,17 @@ export function useUser() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     let cancelled = false;
 
     (async () => {
       try {
-        const res = await fetch(`${BACKEND_URL}/auth/me`, {
-          credentials: "include",
-        });
-        const data = await res.json();
+        // *** ALWAYS call /auth/me — token will be attached automatically ***
+        const data = await apiFetch("/auth/me");
+        console.log("ME RESPONSE:", data);
 
-        if (!data.user?.username) {
+        if (!data?.user) {
           if (!cancelled) setLoading(false);
           return;
         }
@@ -57,9 +58,11 @@ export function useUser() {
         if (!cancelled) {
           setState({
             user: {
+              id: data.user.id,
               username: data.user.username,
               teamId: data.user.teamId ?? null,
               bannedUntil,
+              role: data.user.role,
             },
             bannedDate,
             isTempBanned,
@@ -67,7 +70,7 @@ export function useUser() {
           });
         }
       } catch (err) {
-        console.error("Error fetching user:", err);
+        console.error("useUser /auth/me failed:", err);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -78,8 +81,5 @@ export function useUser() {
     };
   }, []);
 
-  return {
-    ...state,
-    loading,
-  };
+  return { ...state, loading };
 }

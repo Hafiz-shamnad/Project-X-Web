@@ -1,5 +1,5 @@
 /**
- * Challenge Controller (ESM + Optimized)
+ * Challenge Controller (ESM + Secured + Optimized)
  */
 
 import prisma from "../config/db.js";
@@ -8,6 +8,11 @@ import {
   stopChallengeContainer,
   extendChallengeContainer
 } from "../services/containerService.js";
+
+/* Helper: Build absolute base URL */
+function getBaseUrl(req) {
+  return `${req.protocol}://${req.get("host")}`;
+}
 
 /* -------------------------------------------------------------------------- */
 /*                               Get Challenge                                 */
@@ -18,7 +23,7 @@ export async function getChallengeById(req, res) {
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
 
-    const ch = await prisma.challenge.findUnique({
+    const challenge = await prisma.challenge.findUnique({
       where: { id },
       select: {
         id: true,
@@ -27,26 +32,29 @@ export async function getChallengeById(req, res) {
         category: true,
         difficulty: true,
         points: true,
-        filePath: true
+        filePath: true,
+        released: true,
+        hasContainer: true,
+        createdAt: true
       }
     });
 
-    if (!ch) return res.status(404).json({ error: "Challenge not found" });
+    if (!challenge) return res.status(404).json({ error: "Challenge not found" });
 
-    const base = `${req.protocol}://${req.get("host")}`;
+    const base = getBaseUrl(req);
 
     return res.json({
-      ...ch,
-      fileUrl: ch.filePath ? `${base}/${ch.filePath}` : null
+      ...challenge,
+      fileUrl: challenge.filePath ? `${base}/uploads/${challenge.filePath.split("/").pop()}` : null
     });
   } catch (err) {
-    console.error("getChallenge error:", err);
+    console.error("getChallengeById error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 }
 
 /* -------------------------------------------------------------------------- */
-/*                             Get Challenges                                  */
+/*                             Get All Challenges                              */
 /* -------------------------------------------------------------------------- */
 
 export async function getChallenges(req, res) {
@@ -62,7 +70,10 @@ export async function getChallenges(req, res) {
   }
 }
 
-/* Public released challenges */
+/* -------------------------------------------------------------------------- */
+/*                        Public Released Challenges                           */
+/* -------------------------------------------------------------------------- */
+
 export async function getPublicChallenges(req, res) {
   try {
     const challenges = await prisma.challenge.findMany({
@@ -75,22 +86,35 @@ export async function getPublicChallenges(req, res) {
         difficulty: true,
         points: true,
         filePath: true,
-        createdAt: true
+        createdAt: true,
+        hasContainer: true
       },
       orderBy: { createdAt: "desc" }
     });
 
     return res.json(challenges);
   } catch (err) {
-    return res
-      .status(500)
-      .json({ error: "Failed to fetch public challenges" });
+    console.error("getPublicChallenges error:", err);
+    return res.status(500).json({ error: "Failed to fetch public challenges" });
   }
 }
 
 /* -------------------------------------------------------------------------- */
-/*                   Docker Challenge Instance Management                     */
+/*                     Docker Challenge Instance Management                    */
 /* -------------------------------------------------------------------------- */
+
+async function ensureChallengeExists(challengeId) {
+  return prisma.challenge.findUnique({
+    where: { id: challengeId },
+    select: {
+      id: true,
+      released: true,
+      hasContainer: true
+    }
+  });
+}
+
+/* ---------------------------- Start Instance ------------------------------ */
 
 export async function startChallenge(req, res) {
   try {
@@ -98,7 +122,19 @@ export async function startChallenge(req, res) {
     const challengeId = Number(req.params.id);
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
+    const challenge = await ensureChallengeExists(challengeId);
+    if (!challenge) return res.status(404).json({ error: "Challenge not found" });
+
+    if (!challenge.released) {
+      return res.status(403).json({ error: "Challenge not yet released" });
+    }
+
+    if (!challenge.hasContainer) {
+      return res.status(400).json({ error: "Challenge does not have a container instance" });
+    }
+
     const result = await startChallengeContainer(userId, challengeId);
+
     return res.json(result);
   } catch (err) {
     console.error("startChallenge error:", err);
@@ -106,11 +142,20 @@ export async function startChallenge(req, res) {
   }
 }
 
+/* ----------------------------- Stop Instance ------------------------------ */
+
 export async function stopChallenge(req, res) {
   try {
     const userId = req.user?.id;
     const challengeId = Number(req.params.id);
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const challenge = await ensureChallengeExists(challengeId);
+    if (!challenge) return res.status(404).json({ error: "Challenge not found" });
+
+    if (!challenge.hasContainer) {
+      return res.status(400).json({ error: "Challenge has no container instance" });
+    }
 
     const result = await stopChallengeContainer(userId, challengeId);
     return res.json(result);
@@ -120,20 +165,18 @@ export async function stopChallenge(req, res) {
   }
 }
 
+/* --------------------------- Get Instance Status -------------------------- */
+
 export async function getChallengeInstance(req, res) {
-  try {
+  try{
     const userId = req.user?.id;
     const challengeId = Number(req.params.id);
-
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const ch = await prisma.challenge.findUnique({
-      where: { id: challengeId },
-      select: { hasContainer: true }
-    });
+    const challenge = await ensureChallengeExists(challengeId);
+    if (!challenge) return res.status(404).json({ error: "Challenge not found" });
 
-    if (!ch) return res.status(404).json({ error: "Not found" });
-    if (!ch.hasContainer) return res.json({ status: "no-container" });
+    if (!challenge.hasContainer) return res.json({ status: "no-container" });
 
     const inst = await prisma.userContainer.findFirst({
       where: { userId, challengeId }
@@ -141,17 +184,21 @@ export async function getChallengeInstance(req, res) {
 
     if (!inst) return res.json({ status: "none" });
 
+    const base = getBaseUrl(req);
+
     return res.json({
       status: "running",
       port: inst.port,
-      url: `http://localhost:${inst.port}`,
+      url: `${base.replace("http://", "http://")}:${inst.port}`,
       expiresAt: inst.expiresAt
     });
   } catch (err) {
-    console.error("getInstance error:", err);
+    console.error("getChallengeInstance error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 }
+
+/* --------------------------- Spawn New Instance --------------------------- */
 
 export async function spawnChallengeInstance(req, res) {
   try {
@@ -159,34 +206,52 @@ export async function spawnChallengeInstance(req, res) {
     const challengeId = Number(req.params.id);
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
+    const challenge = await ensureChallengeExists(challengeId);
+    if (!challenge) return res.status(404).json({ error: "Challenge not found" });
+
+    if (!challenge.released) {
+      return res.status(403).json({ error: "Challenge not released" });
+    }
+
+    if (!challenge.hasContainer) {
+      return res.status(400).json({ error: "Challenge has no container instance" });
+    }
+
     const result = await startChallengeContainer(userId, challengeId);
+
+    const base = getBaseUrl(req);
 
     return res.json({
       status: result.status,
       port: result.port,
-      url: `http://localhost:${result.port}`,
+      url: `${base}:${result.port}`,
       expiresAt: result.expiresAt
     });
   } catch (err) {
-    console.error("spawn error:", err);
+    console.error("spawnChallengeInstance error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 }
 
+/* ------------------------------- Extend TTL ------------------------------- */
+
 export async function extendInstance(req, res) {
   try {
-    const result = await extendChallengeContainer(
-      req.user.id,
-      Number(req.params.id)
-    );
+    const userId = req.user?.id;
+    const challengeId = Number(req.params.id);
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const challenge = await ensureChallengeExists(challengeId);
+    if (!challenge) return res.status(404).json({ error: "Challenge not found" });
+
+    const result = await extendChallengeContainer(userId, challengeId);
 
     if (result.error) return res.status(400).json(result);
+
     return res.json(result);
   } catch (err) {
-    console.error("extend error:", err);
-    return res
-      .status(500)
-      .json({ error: "Failed to extend challenge instance" });
+    console.error("extendInstance error:", err);
+    return res.status(500).json({ error: "Failed to extend challenge instance" });
   }
 }
 

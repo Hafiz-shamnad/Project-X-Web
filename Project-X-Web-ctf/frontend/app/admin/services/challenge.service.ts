@@ -1,28 +1,37 @@
 import { apiClient, apiUpload } from "./api.client";
 
-export const ChallengeService = {
-  /** Get all challenges */
-  list() {
-    return apiClient("/admin/challenges");
+export interface IChallengeService {
+  list(): Promise<any>;
+  create(formData: FormData): Promise<any>;
+  delete(id: number): Promise<any>;
+  toggle(id: number, released: boolean): Promise<any>;
+}
+
+export const ChallengeService: IChallengeService = {
+  // GET /challenges
+  list: async () => {
+    return apiClient("/challenges", {
+      method: "GET",
+    });
   },
 
-  /** Create challenge using FormData */
-  create(fd: FormData) {
-    return apiUpload("/admin/challenge", fd, "POST");
+  // POST /challenges (FormData upload)
+  create: async (formData: FormData) => {
+    return apiUpload("/challenges", formData, "POST");
   },
 
-  /** Delete a challenge by ID */
-  delete(id: number) {
-    return apiClient(`/admin/challenge/${id}`, {
+  // DELETE /challenges/:id
+  delete: async (id: number) => {
+    return apiClient(`/challenges/${id}`, {
       method: "DELETE",
     });
   },
 
-  /** Toggle release state */
-  toggle(id: number, released: boolean) {
-    return apiClient(`/admin/challenge/${id}/toggle`, {
+  // PATCH /challenges/:id/toggle-release
+  toggle: async (id: number, released: boolean) => {
+    return apiClient(`/challenges/${id}/toggle-release`, {
       method: "PATCH",
-      body: JSON.stringify({ released }),
+      json: { released },
     });
   },
 };

@@ -1,144 +1,138 @@
-/**
- * Authentication Controller (ESM + Optimized)
- * -------------------------------------------
- * Handles:
- *  - Registration
- *  - Login
- *  - Logout
- *  - Session check
- */
-
+// src/controllers/authController.js
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import prisma from "../config/db.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
-const JWT_EXPIRES_IN = "7d";
-const BCRYPT_ROUNDS = 12;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS || 12);
 
-/* -------------------------------------------------------------------------- */
-/*                              Helper: Generate JWT                           */
-/* -------------------------------------------------------------------------- */
-
+/* ---------------------------------------------------------
+   Helper: Generate JWT Token (clean + consistent)
+--------------------------------------------------------- */
 function generateToken(user) {
   return jwt.sign(
-    { userId: user.id, username: user.username, role: user.role },
+    {
+      userId: user.id,
+      username: user.username,
+      role: user.role || "user",
+    },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN }
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                           Cookie Configuration                              */
-/* -------------------------------------------------------------------------- */
-
-const cookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
-  maxAge: 7 * 86400 * 1000, // 7 days
-};
-
-/* -------------------------------------------------------------------------- */
-/*                                    REGISTER                                 */
-/* -------------------------------------------------------------------------- */
-
+/* ---------------------------------------------------------
+   REGISTER USER
+--------------------------------------------------------- */
 export async function register(req, res) {
   try {
-    const { username, password, email } = req.body;
+    console.log("📩 REGISTER:", req.body);
 
-    if (!username || !password)
+    const { username, password, email } = req.body || {};
+
+    if (!username || !password) {
       return res.status(400).json({ error: "Username and password required" });
+    }
 
-    const exists = await prisma.user.findUnique({ where: { username } });
-    if (exists)
+    const existing = await prisma.user.findUnique({ where: { username } });
+    if (existing) {
       return res.status(409).json({ error: "Username already exists" });
+    }
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     const user = await prisma.user.create({
-      data: { username, passwordHash, email },
+      data: { username, passwordHash, email, role: "user" },
     });
 
     const token = generateToken(user);
-    res.cookie("token", token, cookieOptions);
 
     return res.json({
       message: "Registration successful",
-      user: { id: user.id, username: user.username, role: user.role },
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        email: user.email,
+      },
     });
   } catch (err) {
-    console.error("Register error:", err);
+    console.error("🔥 REGISTER ERROR:", err);
     return res.status(500).json({ error: "Server error" });
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                      LOGIN                                  */
-/* -------------------------------------------------------------------------- */
-
+/* ---------------------------------------------------------
+   LOGIN USER (Bearer Token Only)
+--------------------------------------------------------- */
 export async function login(req, res) {
   try {
-    const { username, password } = req.body;
+    console.log("🔐 LOGIN:", req.body);
+
+    const { username, password } = req.body || {};
+
+    if (!username || !password) {
+      return res.status(400).json({ error: "Username and password required" });
+    }
 
     const user = await prisma.user.findUnique({
       where: { username },
       select: {
         id: true,
         username: true,
+        email: true,
         role: true,
         passwordHash: true,
       },
     });
 
-    if (!user)
-      return res.status(401).json({ error: "Invalid credentials" });
+    if (!user) {
+      return res.status(401).json({ error: "Invalid username or password" });
+    }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid)
-      return res.status(401).json({ error: "Invalid credentials" });
+    if (!valid) {
+      return res.status(401).json({ error: "Invalid username or password" });
+    }
 
     const token = generateToken(user);
-    res.cookie("token", token, cookieOptions);
 
     return res.json({
       message: "Login successful",
-      user: { id: user.id, username: user.username, role: user.role },
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        email: user.email,
+      },
     });
   } catch (err) {
-    console.error("Login error:", err);
+    console.error("🔥 LOGIN ERROR:", err);
     return res.status(500).json({ error: "Server error" });
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                      LOGOUT                                 */
-/* -------------------------------------------------------------------------- */
-
+/* ---------------------------------------------------------
+   LOGOUT (NOT USED IN BEARER VERSION, RETURN MESSAGE ONLY)
+--------------------------------------------------------- */
 export function logout(req, res) {
-  res.clearCookie("token", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-  });
-
-  return res.json({ message: "Logged out successfully" });
+  return res.json({ message: "Logged out (remove token on client side)" });
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                      ME                                     */
-/* -------------------------------------------------------------------------- */
-
+/* ---------------------------------------------------------
+   /me (Authenticated user info)
+--------------------------------------------------------- */
 export async function me(req, res) {
   try {
-    const token = req.cookies?.token;
-    if (!token)
+    if (!req.user?.id) {
       return res.status(401).json({ error: "Not authenticated" });
-
-    const decoded = jwt.verify(token, JWT_SECRET);
+    }
 
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+      where: { id: req.user.id },
       select: {
         id: true,
         username: true,
@@ -146,13 +140,18 @@ export async function me(req, res) {
         role: true,
         createdAt: true,
         team: {
-          select: { id: true, name: true, bannedUntil: true },
+          select: {
+            id: true,
+            name: true,
+            bannedUntil: true,
+          },
         },
       },
     });
 
-    if (!user)
+    if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
 
     return res.json({
       user: {
@@ -167,13 +166,8 @@ export async function me(req, res) {
       },
     });
   } catch (err) {
-    console.error("Auth /me error:", err);
-
-    if (err.name === "TokenExpiredError") {
-      return res.status(401).json({ error: "Session expired" });
-    }
-
-    return res.status(401).json({ error: "Invalid or expired token" });
+    console.error("🔥 ME ERROR:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 }
 

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import React, { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -20,15 +20,12 @@ async function apiFetch(endpoint: string, options?: any) {
 export default function LoginPage() {
   const router = useRouter();
 
-  const [form, setForm] = useState({
-    username: '',
-    password: '',
-  });
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
 
-  const [status, setStatus] = useState({
-    loading: false,
-    error: '',
-  });
+  const handleLogin = async (e: any) => {
+    e.preventDefault();
+    console.log("LOGIN PAYLOAD:", { username, password });
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,30 +39,13 @@ export default function LoginPage() {
     async () => {
       setStatus({ loading: true, error: '' });
 
-      try {
-        const response = await apiFetch('/auth/login', {
-          method: 'POST',
-          body: JSON.stringify(form),
-        });
+    console.log("LOGIN SUCCESS TOKEN:", data.token);
 
-        if (response.error) {
-          setStatus({ loading: false, error: response.error });
-          return;
-        }
+    localStorage.setItem("token", data.token);
 
-        const role = response?.user?.role;
-
-        router.push(role === 'admin' ? '/admin' : '/dashboard');
-      } catch (err) {
-        console.error('Login error:', err);
-        setStatus({
-          loading: false,
-          error: 'Unexpected server error. Please try again.',
-        });
-      }
-    },
-    [form, router]
-  );
+    console.log("REDIRECTING TO /dashboard ...");
+    router.replace("/dashboard");
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

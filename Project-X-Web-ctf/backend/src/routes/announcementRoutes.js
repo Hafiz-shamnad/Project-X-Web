@@ -1,3 +1,9 @@
+/**
+ * Announcement Routes (ESM + Optimized)
+ * -------------------------------------
+ * All announcement routes require authentication (Bearer JWT).
+ */
+
 import express from "express";
 import { authenticate } from "../middlewares/auth.js";
 
@@ -10,9 +16,19 @@ import {
 
 const router = express.Router();
 
-router.post("/", authenticate, createAnnouncement);
-router.get("/", authenticate, getAnnouncements);
-router.get("/unread", authenticate, unreadCount);
-router.post("/:id/read", authenticate, markRead);
+// Apply auth to all routes in this module
+router.use(authenticate);
+
+// Create announcement
+router.post("/", createAnnouncement);
+
+// Get all announcements for the user
+router.get("/", getAnnouncements);
+
+// Get unread announcement count
+router.get("/unread", unreadCount);
+
+// Mark single announcement as read
+router.post("/:id/read", markRead);
 
 export default router;
