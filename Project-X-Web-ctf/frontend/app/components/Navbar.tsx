@@ -85,15 +85,14 @@ export default function Navbar() {
 
     const loadUser = async () => {
       try {
-        const data = await apiFetch("/auth/me"); // <-- USE API CLIENT
+        const data = await apiFetch("/auth/me"); // returns JSON directly
         if (!active) return;
 
-        if (res.ok) {
-          const data = await res.json();
+        if (data?.user) {
           setUser(data.user);
         }
       } catch {
-        // ignore
+        // fail silently
       }
     };
 
