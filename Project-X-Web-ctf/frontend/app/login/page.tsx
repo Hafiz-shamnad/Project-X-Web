@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, User, LogIn, Shield, AlertCircle } from 'lucide-react';
+import { Lock, User, Shield, AlertCircle } from 'lucide-react';
 
 async function apiFetch(endpoint: string, options?: any) {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -19,6 +19,23 @@ export default function LoginPage() {
 
   const [form, setForm] = useState({ username: '', password: '' });
   const [status, setStatus] = useState({ loading: false, error: '' });
+
+  /* ------------------------------------------------------
+     🆕 AUTO-REDIRECT IF ALREADY LOGGED IN
+  ------------------------------------------------------ */
+  useEffect(() => {
+    async function checkSession() {
+      try {
+        const me = await apiFetch("/auth/me");
+
+        if (me?.user) {
+          const role = me.user.role;
+          router.replace(role === 'admin' ? '/admin' : '/dashboard');
+        }
+      } catch {}
+    }
+    checkSession();
+  }, [router]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -64,41 +81,34 @@ export default function LoginPage() {
         <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
       </div>
 
-      {/* Grid Pattern */}
+      {/* Grid Overlay */}
       <div className="fixed inset-0 bg-[linear-gradient(rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none"></div>
 
-      {/* Content */}
+      {/* Login Card */}
       <div className="relative z-10 w-full max-w-md">
         <div className="relative backdrop-blur-xl bg-slate-900/60 border border-blue-500/30 rounded-3xl shadow-[0_8px_32px_rgba(59,130,246,0.2)] overflow-hidden">
           
-          {/* Header + Shield */}
+          {/* Header */}
           <div className="relative h-32 bg-gradient-to-r from-blue-500/20 via-cyan-500/20 to-purple-500/20 border-b border-blue-500/30">
             <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.05)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
 
             <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
-              <div className="relative">
-                <div className="absolute inset-0 bg-blue-500/40 rounded-2xl blur-2xl"></div>
-                <div className="relative p-4 rounded-2xl bg-gradient-to-br from-blue-500/80 to-cyan-500/80 border-2 border-blue-400/50 shadow-lg">
-                  <Shield className="w-12 h-12 text-white" />
-                </div>
+              <div className="relative p-4 rounded-2xl bg-gradient-to-br from-blue-500/80 to-cyan-500/80 border-2 border-blue-400/50 shadow-lg">
+                <Shield className="w-12 h-12 text-white" />
               </div>
             </div>
           </div>
 
-          {/* Form Area */}
+          {/* Body */}
           <div className="p-8 pt-16">
-            
-            {/* Title */}
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-black bg-gradient-to-r from-blue-300 via-cyan-300 to-purple-300 bg-clip-text text-transparent mb-2">Welcome Back</h1>
-              <p className="text-slate-400">Sign in to continue your journey</p>
-            </div>
+            <h1 className="text-4xl text-center font-black bg-gradient-to-r from-blue-300 via-cyan-300 to-purple-300 bg-clip-text text-transparent mb-2">
+              Welcome Back
+            </h1>
+            <p className="text-center text-slate-400 mb-8">Sign in to continue your journey</p>
 
-            {/* Inputs */}
-            <div className="space-y-5">
-              
-              {/* USERNAME */}
-              <div className="space-y-2">
+            {/* USERNAME */}
+            <div className="space-y-4">
+              <div>
                 <label className="text-sm font-semibold text-slate-300 flex items-center gap-2">
                   <User className="w-4 h-4" /> Username
                 </label>
@@ -116,7 +126,7 @@ export default function LoginPage() {
               </div>
 
               {/* PASSWORD */}
-              <div className="space-y-2">
+              <div>
                 <label className="text-sm font-semibold text-slate-300 flex items-center gap-2">
                   <Lock className="w-4 h-4" /> Password
                 </label>
@@ -160,21 +170,16 @@ export default function LoginPage() {
             </div>
 
             {/* REGISTER LINK */}
-            <div className="mt-8 text-center">
-              <p className="text-sm text-slate-400">
-                Don't have an account?{' '}
-                <a href="/register" className="text-blue-400 hover:text-blue-300">Register now →</a>
-              </p>
-            </div>
-
+            <p className="mt-8 text-center text-sm text-slate-400">
+              Don't have an account?{' '}
+              <a href="/register" className="text-blue-400 hover:text-blue-300">Register now →</a>
+            </p>
           </div>
         </div>
 
-        <div className="mt-6 text-center">
-          <p className="text-xs text-slate-500 flex justify-center gap-2">
-            <Lock className="w-3 h-3" /> Your connection is secure and encrypted
-          </p>
-        </div>
+        <p className="mt-6 text-center text-xs text-slate-500 flex justify-center gap-2">
+          <Lock className="w-3 h-3" /> Your connection is secure and encrypted
+        </p>
       </div>
     </div>
   );

@@ -8,8 +8,7 @@ import React, {
   useCallback,
 } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence, type Transition } from "framer-motion";
-import { AlertCircle, X } from "lucide-react";
+import { AlertCircle, X, Edit3, Send, Keyboard } from "lucide-react";
 
 /* ---------------------------------------
    PROPS
@@ -41,12 +40,19 @@ export default function InputModal({
 }: InputModalProps) {
   const [value, setValue] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    if (!isOpen) setValue("");
+    if (isOpen) {
+      setIsVisible(true);
+    } else {
+      setValue("");
+      const timer = setTimeout(() => setIsVisible(false), 300);
+      return () => clearTimeout(timer);
+    }
   }, [isOpen]);
 
   /* Keyboard shortcuts */
@@ -75,120 +81,132 @@ export default function InputModal({
     []
   );
 
-  if (!mounted || !portalRoot) return null;
-
-  const modalTransition: Transition = {
-    type: "spring",
-    stiffness: 220,
-    damping: 20,
-  };
+  if (!mounted || !portalRoot || !isVisible) return null;
 
   return createPortal(
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 backdrop-blur-xl"
-          onClick={(e) => e.target === e.currentTarget && onCancel()}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+    <div
+      className={`fixed inset-0 z-[999999] flex items-center justify-center p-4 transition-all duration-300 ${
+        isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+      }`}
+      style={{ backdropFilter: isOpen ? "blur(8px)" : "blur(0px)" }}
+    >
+      {/* Overlay */}
+      <div
+        className="absolute inset-0 bg-black/80 transition-opacity duration-300"
+        onClick={onCancel}
+      />
+
+      {/* Modal */}
+      <div
+        className={`relative z-[1000000] backdrop-blur-xl bg-slate-900/90 border border-blue-500/30 rounded-2xl shadow-[0_8px_32px_rgba(59,130,246,0.25)] max-w-lg w-full overflow-hidden transition-all duration-300 ${
+          isOpen ? "scale-100 opacity-100" : "scale-90 opacity-0"
+        }`}
+      >
+        {/* Background Effects */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        {/* Close Button */}
+        <button
+          onClick={onCancel}
+          className="absolute top-4 right-4 z-10 p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all"
         >
-          <motion.div
-            className="
-              relative bg-slate-900/90 border border-blue-500/30 rounded-2xl 
-              p-8 max-w-md w-full shadow-[0_8px_32px_rgba(59,130,246,0.25)]
-              overflow-hidden
-            "
-            initial={{ scale: 0.85, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.85, opacity: 0 }}
-            transition={modalTransition}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Glow */}
-            <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/20 blur-3xl pointer-events-none" />
+          <X className="w-5 h-5" />
+        </button>
 
-            {/* Grid pattern */}
-            <div className="
-                absolute inset-0 pointer-events-none 
-                bg-[linear-gradient(rgba(59,130,246,0.04)_1px,transparent_1px),
-                     linear-gradient(90deg,rgba(59,130,246,0.04)_1px,transparent_1px)]
-                bg-[size:20px_20px]
-            " />
-
-            {/* Close button */}
-            <button
-              onClick={onCancel}
-              className="absolute top-4 right-4 p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {/* Content */}
-            <div className="relative">
-              {/* Title */}
-              <h3 className="text-2xl font-black text-blue-300 mb-3 flex items-center gap-2">
-                <AlertCircle className="w-6 h-6 text-blue-400" />
+        {/* Content */}
+        <div className="relative p-8">
+          {/* Icon & Title */}
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 rounded-2xl bg-gradient-to-br from-blue-500/20 via-cyan-500/10 to-transparent border border-blue-500/30 backdrop-blur-sm">
+              <Edit3 className="w-8 h-8 text-blue-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-3xl font-black bg-gradient-to-r from-blue-300 via-cyan-300 to-purple-300 bg-clip-text text-transparent">
                 {title}
               </h3>
+            </div>
+          </div>
 
-              {/* Message */}
-              <p className="text-slate-300 text-sm mb-6 leading-relaxed">
+          {/* Message */}
+          {message && (
+            <div className="mb-6 p-4 rounded-xl bg-slate-800/40 border border-slate-700/50">
+              <p className="text-slate-300 text-sm leading-relaxed">
                 {message}
               </p>
+            </div>
+          )}
 
-              {/* Label */}
-              <label className="block text-sm text-blue-400 mb-2">{label}</label>
-
-              {/* Input */}
+          {/* Input Field */}
+          <div className="space-y-3 mb-6">
+            <label className="block text-sm font-semibold text-blue-300 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              {label}
+            </label>
+            <div className="relative">
               <input
                 ref={inputRef}
                 type={inputType}
                 placeholder={placeholder}
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                className="
-                  w-full p-3 bg-slate-800/60 rounded-xl text-blue-200 
-                  border border-blue-500/30 placeholder-blue-500/40
-                  focus:outline-none focus:border-blue-400
-                  focus:ring-2 focus:ring-blue-600/40
-                  transition
-                "
+                className="w-full p-4 pl-12 bg-slate-800/50 rounded-xl text-slate-200 border border-blue-500/30 placeholder:text-slate-500 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 transition-all"
               />
-
-              {/* Buttons */}
-              <div className="flex justify-end gap-3 mt-7">
-                <button
-                  onClick={onCancel}
-                  className="
-                    px-5 py-2 rounded-xl font-semibold
-                    bg-slate-800/50 border border-slate-700 text-slate-300
-                    hover:bg-slate-800 hover:text-white hover:border-slate-600
-                    transition-all
-                  "
-                >
-                  {cancelText}
-                </button>
-
-                <button
-                  disabled={!value.trim()}
-                  onClick={() => onConfirm(value)}
-                  className="
-                    px-5 py-2 rounded-xl font-bold text-white
-                    bg-gradient-to-r from-blue-500 to-cyan-500
-                    hover:from-blue-600 hover:to-cyan-600
-                    shadow-lg transition-all hover:scale-105
-                    disabled:opacity-40 disabled:cursor-not-allowed
-                  "
-                >
-                  {confirmText}
-                </button>
-              </div>
+              <Edit3 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-500/50" />
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
+          </div>
+
+          {/* Keyboard Hint */}
+          <div className="mb-6 flex items-center gap-2 text-xs text-slate-500">
+            <Keyboard className="w-3 h-3" />
+            <span>Press <kbd className="px-1.5 py-0.5 rounded bg-slate-800/50 border border-slate-700 text-slate-400">Enter</kbd> to submit or <kbd className="px-1.5 py-0.5 rounded bg-slate-800/50 border border-slate-700 text-slate-400">Esc</kbd> to cancel</span>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={onCancel}
+              className="px-6 py-3 rounded-xl font-bold text-slate-300 bg-slate-800/50 border border-slate-700 hover:bg-slate-800 hover:text-white hover:border-slate-600 transition-all duration-300"
+            >
+              {cancelText}
+            </button>
+
+            <button
+              disabled={!value.trim()}
+              onClick={() => onConfirm(value)}
+              className="px-6 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-[0_4px_20px_rgba(59,130,246,0.3)] transition-all duration-300 hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2"
+            >
+              <Send className="w-4 h-4" />
+              {confirmText}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.9);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        kbd {
+          font-family: monospace;
+          font-size: 0.75rem;
+        }
+      `}</style>
+    </div>,
     portalRoot
   );
 }

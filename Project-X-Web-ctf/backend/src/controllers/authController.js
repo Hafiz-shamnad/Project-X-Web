@@ -118,6 +118,7 @@ export async function login(req, res) {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? "none" : "lax",
+      partitioned: isProd,
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -127,6 +128,7 @@ export async function login(req, res) {
       httpOnly: false,
       secure: isProd,
       sameSite: isProd ? "none" : "lax",
+      partitioned: true,
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
