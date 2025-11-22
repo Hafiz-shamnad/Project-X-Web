@@ -1,38 +1,35 @@
 /**
- * Team Routes (ESM + Secure + Optimized)
- * --------------------------------------
+ * User Routes (ESM + Clean + Secured)
  */
 
-import express from "express";
-import { authenticate } from "../middlewares/auth.js";
+import { Router } from "express";
 
 import {
-  getMyTeam,
-  createTeam,
-  joinTeam,
-  getTeamSolves,
-} from "../controllers/teamController.js";
+  createOrGetUser,
+  getUser,
+  toggleSolve,
+} from "../controllers/userController.js";
 
-const router = express.Router();
+import { authenticate } from "../middlewares/auth.js";
 
-/* --------------------------------------------------------------------------
-   AUTHENTICATED TEAM ACTIONS (all routes require auth)
-   -------------------------------------------------------------------------- */
-router.use(authenticate);
+const router = Router();
 
-/** Get the authenticated user's team */
-router.get("/me", getMyTeam);
+/* ---------------------------------------------------------
+   PUBLIC ROUTES
+--------------------------------------------------------- */
 
-/** Create a new team */
-router.post("/create", createTeam);
+// Create or fetch user by username
+router.post("/create", createOrGetUser);
 
-/** Join a team via join code */
-router.post("/join", joinTeam);
+// Get user profile (with solved challenges)
+router.get("/:username", getUser);
 
-/* --------------------------------------------------------------------------
-   GET TEAM SOLVES BY ID 
-   (must remain last to avoid matching /me, /create, etc.)
-   -------------------------------------------------------------------------- */
-router.get("/:id/solves", getTeamSolves);
+
+/* ---------------------------------------------------------
+   PROTECTED ROUTES (Requires login via HttpOnly cookie)
+--------------------------------------------------------- */
+
+// Toggle challenge solve
+router.post("/solve/toggle", authenticate, toggleSolve);
 
 export default router;
