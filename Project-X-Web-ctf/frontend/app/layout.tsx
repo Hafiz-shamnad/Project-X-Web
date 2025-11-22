@@ -1,10 +1,7 @@
-// ===================================
-// app/layout.tsx
-// ===================================
 import type { Metadata } from "next";
 import "./globals.css";
-import Navbar from "./components/Navbar";
-import Script from "next/script";
+
+import NavbarWrapper from "./components/NavbarWrapper";
 
 export const metadata: Metadata = {
   title: "Project X - CTF Platform",
@@ -18,16 +15,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head>
-        {/* React DevTools standalone */}
-        <Script
-          src="http://localhost:8097"
-          strategy="beforeInteractive"
-        />
-      </head>
-
       <body className="font-mono">
-        <Navbar />
+        <NavbarWrapper /> 
         {children}
       </body>
     </html>

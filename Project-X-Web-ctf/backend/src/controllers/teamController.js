@@ -6,31 +6,42 @@ import prisma from "../config/db.js";
 import crypto from "crypto";
 
 /* -------------------------------------------------------------------------- */
-/*                             Join Code Generator                             */
+/*                               AUTH HELPER                                   */
 /* -------------------------------------------------------------------------- */
 
-function generateJoinCode() {
-  return crypto.randomBytes(3).toString("hex").toUpperCase(); // e.g. A3F9D2
+function requireUser(req) {
+  if (!req.user?.id) {
+    const error = new Error("Unauthorized");
+    error.status = 401;
+    throw error;
+  }
+  return req.user.id;
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                  Create Team                                */
+/*                        JOIN CODE GENERATOR                                  */
+/* -------------------------------------------------------------------------- */
+
+function generateJoinCode() {
+  return crypto.randomBytes(3).toString("hex").toUpperCase();
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                 CREATE TEAM                                 */
 /* -------------------------------------------------------------------------- */
 
 export async function createTeam(req, res) {
   try {
-    const userId = req.user?.id;
+    const userId = requireUser(req);
     const { name } = req.body;
 
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
-    if (!name || typeof name !== "string") {
+    if (!name || typeof name !== "string" || !name.trim()) {
       return res.status(400).json({ error: "Team name is required" });
     }
 
-    // Check if user already has a team
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { teamId: true },
+      select: { teamId: true }
     });
 
     if (user?.teamId) {
@@ -41,22 +52,23 @@ export async function createTeam(req, res) {
 
     const team = await prisma.team.create({
       data: {
-        name,
+        name: name.trim(),
         joinCode,
-        members: { connect: { id: userId } },
+        members: { connect: { id: userId } }
       },
-      include: { members: true },
+      include: {
+        members: {
+          select: { id: true, username: true }
+        }
+      }
     });
 
     return res.json({ team });
   } catch (err) {
     console.error("createTeam error:", err);
 
-    // Unique constraint (e.g., team name already exists)
     if (err.code === "P2002") {
-      return res
-        .status(400)
-        .json({ error: "A team with this name already exists" });
+      return res.status(400).json({ error: "Team name already exists" });
     }
 
     return res.status(500).json({ error: "Server error creating team" });
@@ -64,23 +76,21 @@ export async function createTeam(req, res) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                   Join Team                                 */
+/*                                  JOIN TEAM                                  */
 /* -------------------------------------------------------------------------- */
 
 export async function joinTeam(req, res) {
   try {
-    const userId = req.user?.id;
+    const userId = requireUser(req);
     const { joinCode } = req.body;
 
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
-    if (!joinCode) {
+    if (!joinCode || typeof joinCode !== "string") {
       return res.status(400).json({ error: "Join code required" });
     }
 
-    // Ensure user is not already in a team
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { teamId: true },
+      select: { teamId: true }
     });
 
     if (user?.teamId) {
@@ -88,22 +98,24 @@ export async function joinTeam(req, res) {
     }
 
     const team = await prisma.team.findUnique({
-      where: { joinCode },
-      include: { members: true },
+      where: { joinCode: joinCode.trim().toUpperCase() },
+      include: {
+        members: { select: { id: true, username: true } }
+      }
     });
 
-    if (!team) {
-      return res.status(404).json({ error: "Invalid join code" });
-    }
+    if (!team) return res.status(404).json({ error: "Invalid join code" });
 
     await prisma.user.update({
       where: { id: userId },
-      data: { teamId: team.id },
+      data: { teamId: team.id }
     });
 
     const updatedTeam = await prisma.team.findUnique({
       where: { id: team.id },
-      include: { members: true },
+      include: {
+        members: { select: { id: true, username: true } }
+      }
     });
 
     return res.json({ team: updatedTeam });
@@ -114,18 +126,16 @@ export async function joinTeam(req, res) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                 Get My Team                                 */
+/*                                  GET MY TEAM                                */
 /* -------------------------------------------------------------------------- */
 
 export async function getMyTeam(req, res) {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const userId = requireUser(req);
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { teamId: true },
+      select: { teamId: true }
     });
 
     if (!user?.teamId) {
@@ -138,55 +148,32 @@ export async function getMyTeam(req, res) {
         members: {
           include: {
             solved: {
-              include: {
-                challenge: {
-                  select: {
-                    id: true,
-                    name: true,
-                    points: true,
-                    category: true,
-                    difficulty: true,
-                  },
-                },
-              },
-              orderBy: { createdAt: "asc" },
-            },
-          },
+              include: { challenge: true },
+              orderBy: { solvedAt: "asc" }
+            }
+          }
         },
         solved: {
-          include: {
-            challenge: {
-              select: {
-                id: true,
-                name: true,
-                points: true,
-                category: true,
-                difficulty: true,
-              },
-            },
-          },
-        },
-      },
+          include: { challenge: true }
+        }
+      }
     });
 
-    if (!team) {
-      return res.status(404).json({ error: "Team not found" });
-    }
+    if (!team) return res.status(404).json({ error: "Team not found" });
 
-    // Total team points from team-level solved entries
-    const totalPoints = (team.solved || []).reduce(
+    const teamPoints = (team.solved || []).reduce(
       (sum, s) => sum + (s.challenge?.points ?? 0),
       0
     );
 
     const members = team.members.map((m) => {
-      const solves = (m.solved || []).map((s) => ({
-        challengeId: s.challenge.id,
+      const solves = m.solved.map((s) => ({
+        challengeId: s.challengeId,
         challengeName: s.challenge.name,
         points: s.challenge.points,
-        solvedAt: s.createdAt,
+        solvedAt: s.solvedAt,
         category: s.challenge.category,
-        difficulty: s.challenge.difficulty,
+        difficulty: s.challenge.difficulty
       }));
 
       return {
@@ -194,7 +181,7 @@ export async function getMyTeam(req, res) {
         username: m.username,
         points: solves.reduce((sum, s) => sum + s.points, 0),
         solveCount: solves.length,
-        solves,
+        solves
       };
     });
 
@@ -203,9 +190,9 @@ export async function getMyTeam(req, res) {
         id: team.id,
         name: team.name,
         joinCode: team.joinCode,
-        totalPoints,
-        members,
-      },
+        totalPoints: teamPoints,
+        members
+      }
     });
   } catch (err) {
     console.error("getMyTeam error:", err);
@@ -214,15 +201,13 @@ export async function getMyTeam(req, res) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                 Team Solves                                 */
+/*                                   TEAM SOLVES                               */
 /* -------------------------------------------------------------------------- */
 
 export async function getTeamSolves(req, res) {
   try {
     const teamId = Number(req.params.id);
-    if (Number.isNaN(teamId)) {
-      return res.status(400).json({ error: "Invalid team ID" });
-    }
+    if (isNaN(teamId)) return res.status(400).json({ error: "Invalid team ID" });
 
     const team = await prisma.team.findUnique({
       where: { id: teamId },
@@ -231,32 +216,28 @@ export async function getTeamSolves(req, res) {
           include: {
             solved: {
               include: { challenge: true },
-              orderBy: { createdAt: "asc" },
-            },
-          },
-        },
-      },
+              orderBy: { solvedAt: "asc" }
+            }
+          }
+        }
+      }
     });
 
-    if (!team) {
-      return res.status(404).json({ error: "Team not found" });
-    }
+    if (!team) return res.status(404).json({ error: "Team not found" });
 
     const solves = team.members.flatMap((member) =>
       member.solved.map((s) => ({
         username: member.username,
         challengeId: s.challengeId,
         createdAt: s.createdAt,
-        challenge: s.challenge,
+        challenge: s.challenge
       }))
     );
 
     return res.json({ teamId, solved: solves });
   } catch (err) {
     console.error("getTeamSolves error:", err);
-    return res
-      .status(500)
-      .json({ error: "Server error fetching team solves" });
+    return res.status(500).json({ error: "Server error fetching team solves" });
   }
 }
 
@@ -264,5 +245,5 @@ export default {
   createTeam,
   joinTeam,
   getMyTeam,
-  getTeamSolves,
+  getTeamSolves
 };

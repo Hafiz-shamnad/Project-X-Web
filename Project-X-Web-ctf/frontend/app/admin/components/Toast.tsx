@@ -6,7 +6,7 @@ import { CheckCircle, AlertCircle } from "lucide-react";
 export default function Toast({
   message,
   type,
-  duration = 3000, // auto-hide in 3s
+  duration = 3000,
 }: {
   message: string | null;
   type: "success" | "error";
@@ -14,19 +14,13 @@ export default function Toast({
 }) {
   const [visible, setVisible] = useState(false);
 
-  // Handle appear + auto-dismiss
   useEffect(() => {
     if (!message) return;
 
     setVisible(true);
 
-    const hideTimer = setTimeout(() => {
-      setVisible(false);
-    }, duration - 300); // start fade-out slightly early
-
-    const destroyTimer = setTimeout(() => {
-      setVisible(false);
-    }, duration);
+    const hideTimer = setTimeout(() => setVisible(false), duration - 300);
+    const destroyTimer = setTimeout(() => setVisible(false), duration);
 
     return () => {
       clearTimeout(hideTimer);
@@ -41,7 +35,7 @@ export default function Toast({
       role="status"
       aria-live="polite"
       className={`
-        fixed top-6 right-6 z-50
+        fixed top-6 right-6 z-[999999]   /* 🔥 always above navbar */
         px-6 py-4 rounded-lg border backdrop-blur-md shadow-lg
         flex items-center gap-3 transition-all duration-300
 

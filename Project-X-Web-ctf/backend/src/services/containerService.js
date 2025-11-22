@@ -1,54 +1,72 @@
 /**
- * Container Service (ESM Version)
- * -------------------------------
- * Handles starting/stopping user-specific Docker containers.
+ * Container Service (ESM + Hardened + Optimized)
+ * -----------------------------------------------
+ * Handles:
+ *   - Per-user Docker container lifecycle
+ *   - TTL extension logic
+ *   - DB synchronization
  */
 
 import prisma from "../config/db.js";
 import docker from "../lib/docker.js";
 import { getRandomPort } from "../lib/portAllocator.js";
 
-/**
- * Start per-user container instance
- */
+/* ========================================================================== */
+/*                               START INSTANCE                                */
+/* ========================================================================== */
+
 export async function startChallengeContainer(userId, challengeId) {
-  // Check if instance already exists
+  const now = new Date();
+
+  // Check existing instance ---------------------------------------------------
   const existing = await prisma.userContainer.findFirst({
     where: { userId, challengeId },
   });
 
   if (existing) {
-    return {
-      status: "running",
-      port: existing.port,
-      expiresAt: existing.expiresAt,
-    };
+    // If expired, clean it up instantly
+    if (new Date(existing.expiresAt) <= now) {
+      await stopChallengeContainer(userId, challengeId);
+    } else {
+      return {
+        status: "running",
+        port: existing.port,
+        expiresAt: existing.expiresAt,
+      };
+    }
   }
 
-  // Get challenge info
+  // Fetch challenge info ------------------------------------------------------
   const challenge = await prisma.challenge.findUnique({
     where: { id: challengeId },
-    select: {
-      hasContainer: true,
-      imageName: true,
-    },
+    select: { hasContainer: true, imageName: true },
   });
 
   if (!challenge) throw new Error("Challenge not found");
   if (!challenge.hasContainer) throw new Error("Challenge has no container");
   if (!challenge.imageName) throw new Error("Challenge imageName missing");
 
-  const port = getRandomPort();
+  // Validate image exists -----------------------------------------------------
+  const images = await docker.listImages();
+  const imageExists = images.some((img) =>
+    img.RepoTags?.includes(challenge.imageName)
+  );
 
-  // Create Docker container
+  if (!imageExists) {
+    throw new Error(`Docker image not found: ${challenge.imageName}`);
+  }
+
+  // Allocate random port ------------------------------------------------------
+  const port = await getRandomPort();
+
+  // Create container ----------------------------------------------------------
   const container = await docker.createContainer({
     Image: challenge.imageName,
     name: `u${userId}_c${challengeId}_${Date.now()}`,
     HostConfig: {
       AutoRemove: true,
-      PortBindings: {
-        "80/tcp": [{ HostPort: `${port}` }],
-      },
+      PortBindings: { "80/tcp": [{ HostPort: `${port}` }] },
+      Memory: 256 * 1024 * 1024, // 256MB default cap
     },
     Env: [
       `USER_ID=${userId}`,
@@ -58,9 +76,9 @@ export async function startChallengeContainer(userId, challengeId) {
 
   await container.start();
 
-  const expiresAt = new Date(Date.now() + 45 * 60 * 1000); // 45 min timeout
+  const expiresAt = new Date(Date.now() + 45 * 60 * 1000); // 45min TTL
 
-  // Save instance in DB
+  // Save instance in DB -------------------------------------------------------
   await prisma.userContainer.create({
     data: {
       userId,
@@ -78,9 +96,10 @@ export async function startChallengeContainer(userId, challengeId) {
   };
 }
 
-/**
- * Stop and delete container
- */
+/* ========================================================================== */
+/*                               STOP INSTANCE                                 */
+/* ========================================================================== */
+
 export async function stopChallengeContainer(userId, challengeId) {
   const instance = await prisma.userContainer.findFirst({
     where: { userId, challengeId },
@@ -90,11 +109,18 @@ export async function stopChallengeContainer(userId, challengeId) {
 
   try {
     const container = docker.getContainer(instance.containerId);
-    await container.stop().catch(() => {});
+
+    // Ensure container exists before stopping
+    const exists = await container.inspect().catch(() => null);
+
+    if (exists) {
+      await container.stop({ t: 2 }).catch(() => {});
+    }
   } catch (err) {
-    console.error("Stop error:", err.message);
+    console.error("Stop container error:", err.message);
   }
 
+  // Always delete DB entry
   await prisma.userContainer.delete({
     where: { id: instance.id },
   });
@@ -102,9 +128,10 @@ export async function stopChallengeContainer(userId, challengeId) {
   return { status: "destroyed" };
 }
 
-/**
- * Extend container expiry by +30 minutes (does NOT recreate container)
- */
+/* ========================================================================== */
+/*                             EXTEND INSTANCE TTL                              */
+/* ========================================================================== */
+
 export async function extendChallengeContainer(userId, challengeId) {
   const instance = await prisma.userContainer.findFirst({
     where: { userId, challengeId },
@@ -115,20 +142,28 @@ export async function extendChallengeContainer(userId, challengeId) {
   }
 
   const now = new Date();
-  const currentRemaining =
-    (new Date(instance.expiresAt).getTime() - now.getTime()) / 1000;
+  const expiresAt = new Date(instance.expiresAt);
 
-  const MAX_TIME_SECONDS = 60 * 60; // 60 minutes
-
-  if (currentRemaining >= MAX_TIME_SECONDS) {
-    return { status: "max_reached", remainingSeconds: currentRemaining };
+  // Expired? Stop immediately
+  if (expiresAt <= now) {
+    await stopChallengeContainer(userId, challengeId);
+    return { error: "Container expired" };
   }
 
-  const extendSeconds = 30 * 60; // 30 minutes
-  const newTotal = currentRemaining + extendSeconds;
-  const allowedTotal = Math.min(newTotal, MAX_TIME_SECONDS);
+  const remainingSec = (expiresAt - now) / 1000;
 
-  const newExpiry = new Date(now.getTime() + allowedTotal * 1000);
+  const MAX_TTL = 60 * 60; // 60 minutes
+  const EXTEND_SEC = 30 * 60;
+
+  if (remainingSec >= MAX_TTL) {
+    return {
+      status: "max_reached",
+      remainingSeconds: remainingSec,
+    };
+  }
+
+  const newTTL = Math.min(remainingSec + EXTEND_SEC, MAX_TTL);
+  const newExpiry = new Date(now.getTime() + newTTL * 1000);
 
   await prisma.userContainer.update({
     where: { id: instance.id },

@@ -14,7 +14,7 @@ interface Announcement {
 }
 
 /* ----------------------------------------------------------
- * TIME FORMATTER — Relative Time like “5 minutes ago”
+ * TIME FORMATTER — “5 minutes ago”
  * ---------------------------------------------------------- */
 function timeAgo(dateString: string) {
   const date = new Date(dateString);
@@ -28,7 +28,7 @@ function timeAgo(dateString: string) {
 }
 
 /* ----------------------------------------------------------
- * CATEGORY DETECTOR (adds icons + colors)
+ * CATEGORY DETECTOR
  * ---------------------------------------------------------- */
 function classify(title: string) {
   const t = title.toLowerCase();
@@ -39,12 +39,14 @@ function classify(title: string) {
     return { icon: "🚀", color: "border-green-500 bg-green-500/20" };
   if (t.includes("challenge"))
     return { icon: "🏁", color: "border-yellow-400 bg-yellow-500/20" };
+  if (t.includes("penalty"))
+  return { icon: "⚠️", color: "border-orange-500 bg-orange-500/20" };
 
   return { icon: "⚡", color: "border-blue-400 bg-blue-500/20" };
 }
 
 /* ----------------------------------------------------------
- * TOAST POPUP on NEW announcements (live WS)
+ * TOAST POPUP
  * ---------------------------------------------------------- */
 function NotificationToast({ text }: { text: string }) {
   return (
@@ -64,9 +66,18 @@ function NotificationToast({ text }: { text: string }) {
 }
 
 /* ----------------------------------------------------------
+ * READ COOKIE
+ * ---------------------------------------------------------- */
+function getCookie(name: string) {
+  return document.cookie
+    .split("; ")
+    .find((r) => r.startsWith(name + "="))
+    ?.split("=")[1];
+}
+
+/* ----------------------------------------------------------
  * MAIN PANEL
  * ---------------------------------------------------------- */
-
 export default function AnnouncementPanel({
   open,
   onClose,
@@ -78,7 +89,9 @@ export default function AnnouncementPanel({
   const [toast, setToast] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);
 
-  /* LOAD announcements */
+  /* ----------------------------------------------------------
+   * LOAD announcements when panel opens
+   * ---------------------------------------------------------- */
   useEffect(() => {
     if (!open) return;
 
@@ -90,7 +103,7 @@ export default function AnnouncementPanel({
       const data = await res.json();
       setAnns(data);
 
-      // Mark as read
+      // mark as read
       for (const a of data) {
         fetch(`${BACKEND_URL}/announcement/${a.id}/read`, {
           method: "POST",
@@ -100,12 +113,20 @@ export default function AnnouncementPanel({
     })();
   }, [open]);
 
-  /* WS TOAST LISTENER */
+  /* ----------------------------------------------------------
+   * WEBSOCKET LIVE LISTENER
+   * ---------------------------------------------------------- */
   useEffect(() => {
-    if (!BACKEND_URL) return;
+    const token = getCookie("token");
 
-    const wsURL = BACKEND_URL.replace("http", "ws").replace("/api", "");
-    const ws = new WebSocket(`${wsURL}/ws`);
+    if (!token) {
+      console.warn("❗ WS token missing — WebSocket not connecting.");
+      return;
+    }
+
+    // Convert http -> ws and remove /api
+    const wsURL = BACKEND_URL.replace(/^http/, "ws").replace("/api", "");
+    const ws = new WebSocket(`${wsURL}/ws?token=${token}`);
 
     ws.onmessage = (ev) => {
       try {
@@ -120,16 +141,23 @@ export default function AnnouncementPanel({
     return () => ws.close();
   }, []);
 
-  /* Outside click */
+  /* ----------------------------------------------------------
+   * Outside click closes panel
+   * ---------------------------------------------------------- */
   useEffect(() => {
     if (!open) return;
+
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
+
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open, onClose]);
 
+  /* ----------------------------------------------------------
+   * RENDER
+   * ---------------------------------------------------------- */
   if (!open) return toast ? <NotificationToast text={toast} /> : null;
 
   return (
@@ -180,18 +208,15 @@ export default function AnnouncementPanel({
               className={`mb-4 p-4 rounded-xl border ${meta.color} 
                 shadow-lg hover:scale-[1.02] transition-transform duration-200`}
             >
-              {/* title row */}
               <div className="flex items-center gap-3">
                 <span className="text-xl">{meta.icon}</span>
                 <h4 className="text-blue-100 font-bold text-md">{a.title}</h4>
               </div>
 
-              {/* message */}
               <p className="text-blue-200 text-sm mt-2 leading-relaxed whitespace-pre-line">
                 {a.message}
               </p>
 
-              {/* relative timestamp */}
               <div className="text-right text-xs text-blue-500 mt-3 italic">
                 {timeAgo(a.createdAt)}
               </div>

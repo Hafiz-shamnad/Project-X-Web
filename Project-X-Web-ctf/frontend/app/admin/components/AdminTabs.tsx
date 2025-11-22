@@ -36,7 +36,7 @@ function AdminTabsComponent({ activeTab, setActiveTab }: AdminTabsProps) {
   return (
     <nav
       className="flex flex-wrap justify-center gap-3 py-6 
-                 border-b border-green-500/30 
+                 border-b border-blue-500/30 
                  bg-gray-900/10 backdrop-blur-md"
     >
       {tabs.map((t) => {

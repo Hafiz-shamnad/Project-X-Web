@@ -1,4 +1,4 @@
-// app/lib/api.ts (Bearer Token version only)
+// app/lib/api.ts (FINAL Cookie Auth version)
 
 const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
 
@@ -36,30 +36,33 @@ export async function apiClient<T = any>(endpoint: string, options: ApiOptions =
   const method = options.method || "GET";
   const isJson = options.json !== undefined;
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
+  // ❗ COOKIE auth ONLY — no authorization header
   const headers: HeadersInit = {
     Accept: "application/json",
     ...(isJson ? { "Content-Type": "application/json" } : {}),
     ...(options.headers || {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
   const fetchOptions: RequestInit = {
-    ...options,
     method,
     headers,
-    credentials: "omit", // 🔥 NO COOKIES SENT EVER
+    credentials: "include", // 🍪 ALWAYS send cookies
     body:
       method !== "GET"
         ? isJson
           ? JSON.stringify(options.json)
           : options.body
         : undefined,
+    mode: "cors",
   };
 
   const res = await fetchWithTimeout(url, fetchOptions);
   const data = await safeJsonParse(res);
+
+  // Auto redirect on 401
+  if (res.status === 401 && typeof window !== "undefined") {
+    window.location.href = "/login";
+  }
 
   if (!res.ok) throw new Error(data?.error || data?.message || res.statusText);
   return data as T;
@@ -71,13 +74,11 @@ export async function apiUpload<T = any>(
   method = "POST"
 ) {
   const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const res = await fetchWithTimeout(url, {
     method,
-    credentials: "omit",
+    credentials: "include", // 🍪 send cookies
     body: formData,
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 
   const data = await safeJsonParse(res);
@@ -86,3 +87,5 @@ export async function apiUpload<T = any>(
 }
 
 export const apiFetch = apiClient;
+export const api = apiClient;
+export const apiClientFetch = apiClient;

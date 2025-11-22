@@ -29,7 +29,7 @@ export const ChallengeService: IChallengeService = {
 
   // PATCH /challenges/:id/toggle-release
   toggle: async (id: number, released: boolean) => {
-    return apiClient(`/challenges/${id}/toggle-release`, {
+    return apiClient(`/challenges/${id}/toggle`, {
       method: "PATCH",
       json: { released },
     });

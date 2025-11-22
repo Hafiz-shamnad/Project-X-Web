@@ -9,6 +9,17 @@ import crypto from "crypto";
 const FLAG_SALT = process.env.FLAG_SALT || "";
 
 /**
+ * Normalize flag input:
+ *  - Trim whitespace
+ *  - Remove invisible zero-width characters
+ */
+function normalizeFlag(str) {
+  return str
+    .trim()
+    .replace(/[\u200B-\u200D\uFEFF]/g, ""); // remove zero-width chars
+}
+
+/**
  * Hash a flag using SHA-256 with optional salt.
  * @param {string} flag
  * @returns {string} hex hash
@@ -18,9 +29,11 @@ export function hashFlag(flag) {
     throw new Error("Invalid flag: expected a string");
   }
 
+  const clean = normalizeFlag(flag);
+
   return crypto
     .createHash("sha256")
-    .update(FLAG_SALT + flag.trim())
+    .update(FLAG_SALT + clean)
     .digest("hex");
 }
 

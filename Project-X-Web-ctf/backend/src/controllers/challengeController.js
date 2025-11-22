@@ -9,9 +9,32 @@ import {
   extendChallengeContainer
 } from "../services/containerService.js";
 
-/* Helper: Build absolute base URL */
+/* -------------------------------------------------------------------------- */
+/*                             Helper Functions                                */
+/* -------------------------------------------------------------------------- */
+
 function getBaseUrl(req) {
   return `${req.protocol}://${req.get("host")}`;
+}
+
+function requireUser(req) {
+  if (!req.user?.id) {
+    const error = new Error("Unauthorized");
+    error.status = 401;
+    throw error;
+  }
+  return req.user.id;
+}
+
+async function ensureChallengeExists(challengeId) {
+  return prisma.challenge.findUnique({
+    where: { id: challengeId },
+    select: {
+      id: true,
+      released: true,
+      hasContainer: true
+    }
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -45,7 +68,9 @@ export async function getChallengeById(req, res) {
 
     return res.json({
       ...challenge,
-      fileUrl: challenge.filePath ? `${base}/uploads/${challenge.filePath.split("/").pop()}` : null
+      fileUrl: challenge.filePath
+        ? `${base}/uploads/${challenge.filePath.split("/").pop()}`
+        : null
     });
   } catch (err) {
     console.error("getChallengeById error:", err);
@@ -103,24 +128,10 @@ export async function getPublicChallenges(req, res) {
 /*                     Docker Challenge Instance Management                    */
 /* -------------------------------------------------------------------------- */
 
-async function ensureChallengeExists(challengeId) {
-  return prisma.challenge.findUnique({
-    where: { id: challengeId },
-    select: {
-      id: true,
-      released: true,
-      hasContainer: true
-    }
-  });
-}
-
-/* ---------------------------- Start Instance ------------------------------ */
-
 export async function startChallenge(req, res) {
   try {
-    const userId = req.user?.id;
+    const userId = requireUser(req);
     const challengeId = Number(req.params.id);
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const challenge = await ensureChallengeExists(challengeId);
     if (!challenge) return res.status(404).json({ error: "Challenge not found" });
@@ -128,27 +139,22 @@ export async function startChallenge(req, res) {
     if (!challenge.released) {
       return res.status(403).json({ error: "Challenge not yet released" });
     }
-
     if (!challenge.hasContainer) {
       return res.status(400).json({ error: "Challenge does not have a container instance" });
     }
 
     const result = await startChallengeContainer(userId, challengeId);
-
     return res.json(result);
   } catch (err) {
     console.error("startChallenge error:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(err.status || 500).json({ error: err.message });
   }
 }
 
-/* ----------------------------- Stop Instance ------------------------------ */
-
 export async function stopChallenge(req, res) {
   try {
-    const userId = req.user?.id;
+    const userId = requireUser(req);
     const challengeId = Number(req.params.id);
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const challenge = await ensureChallengeExists(challengeId);
     if (!challenge) return res.status(404).json({ error: "Challenge not found" });
@@ -161,17 +167,14 @@ export async function stopChallenge(req, res) {
     return res.json(result);
   } catch (err) {
     console.error("stopChallenge error:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(err.status || 500).json({ error: err.message });
   }
 }
 
-/* --------------------------- Get Instance Status -------------------------- */
-
 export async function getChallengeInstance(req, res) {
-  try{
-    const userId = req.user?.id;
+  try {
+    const userId = requireUser(req);
     const challengeId = Number(req.params.id);
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const challenge = await ensureChallengeExists(challengeId);
     if (!challenge) return res.status(404).json({ error: "Challenge not found" });
@@ -189,7 +192,7 @@ export async function getChallengeInstance(req, res) {
     return res.json({
       status: "running",
       port: inst.port,
-      url: `${base.replace("http://", "http://")}:${inst.port}`,
+      url: `${base}:${inst.port}`,
       expiresAt: inst.expiresAt
     });
   } catch (err) {
@@ -198,13 +201,10 @@ export async function getChallengeInstance(req, res) {
   }
 }
 
-/* --------------------------- Spawn New Instance --------------------------- */
-
 export async function spawnChallengeInstance(req, res) {
   try {
-    const userId = req.user?.id;
+    const userId = requireUser(req);
     const challengeId = Number(req.params.id);
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const challenge = await ensureChallengeExists(challengeId);
     if (!challenge) return res.status(404).json({ error: "Challenge not found" });
@@ -212,13 +212,11 @@ export async function spawnChallengeInstance(req, res) {
     if (!challenge.released) {
       return res.status(403).json({ error: "Challenge not released" });
     }
-
     if (!challenge.hasContainer) {
       return res.status(400).json({ error: "Challenge has no container instance" });
     }
 
     const result = await startChallengeContainer(userId, challengeId);
-
     const base = getBaseUrl(req);
 
     return res.json({
@@ -233,13 +231,10 @@ export async function spawnChallengeInstance(req, res) {
   }
 }
 
-/* ------------------------------- Extend TTL ------------------------------- */
-
 export async function extendInstance(req, res) {
   try {
-    const userId = req.user?.id;
+    const userId = requireUser(req);
     const challengeId = Number(req.params.id);
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const challenge = await ensureChallengeExists(challengeId);
     if (!challenge) return res.status(404).json({ error: "Challenge not found" });
@@ -247,7 +242,6 @@ export async function extendInstance(req, res) {
     const result = await extendChallengeContainer(userId, challengeId);
 
     if (result.error) return res.status(400).json(result);
-
     return res.json(result);
   } catch (err) {
     console.error("extendInstance error:", err);

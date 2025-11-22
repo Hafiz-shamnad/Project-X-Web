@@ -1,32 +1,38 @@
 /**
- * User Routes (ESM + Optimized)
- * -----------------------------
+ * Team Routes (ESM + Secure + Optimized)
+ * --------------------------------------
  */
 
 import express from "express";
-import {
-  createOrGetUser,
-  getUser,
-  toggleSolve,
-} from "../controllers/userController.js";
-
 import { authenticate } from "../middlewares/auth.js";
+
+import {
+  getMyTeam,
+  createTeam,
+  joinTeam,
+  getTeamSolves,
+} from "../controllers/teamController.js";
 
 const router = express.Router();
 
-/* =====================================================
-   CREATE OR RETRIEVE USER (for legacy / compatibility)
-   ===================================================== */
-router.post("/", createOrGetUser);
+/* --------------------------------------------------------------------------
+   AUTHENTICATED TEAM ACTIONS (all routes require auth)
+   -------------------------------------------------------------------------- */
+router.use(authenticate);
 
-/* =====================================================
-   SOLVE TOGGLE (must be protected)
-   ===================================================== */
-router.post("/solve", authenticate, toggleSolve);
+/** Get the authenticated user's team */
+router.get("/me", getMyTeam);
 
-/* =====================================================
-   PUBLIC USER PROFILE
-   ===================================================== */
-router.get("/:username", getUser);
+/** Create a new team */
+router.post("/create", createTeam);
+
+/** Join a team via join code */
+router.post("/join", joinTeam);
+
+/* --------------------------------------------------------------------------
+   GET TEAM SOLVES BY ID 
+   (must remain last to avoid matching /me, /create, etc.)
+   -------------------------------------------------------------------------- */
+router.get("/:id/solves", getTeamSolves);
 
 export default router;

@@ -1,10 +1,10 @@
 /**
- * Leaderboard Routes (ESM + Optimized)
- * ------------------------------------
- * Public endpoints for:
- *  - Global leaderboard
- *  - Team leaderboard
- *  - Internal team leaderboard
+ * Leaderboard Routes (ESM + Optimized + Collision-Safe)
+ * -----------------------------------------------------
+ * Public endpoints:
+ *   - Global leaderboard
+ *   - Team leaderboard
+ *   - Internal team leaderboard
  */
 
 import express from "express";
@@ -16,13 +16,23 @@ import {
 
 const router = express.Router();
 
-/** Global leaderboard */
+/* -------------------------------------------------------------------------- */
+/*                               GLOBAL LEADERBOARD                            */
+/* -------------------------------------------------------------------------- */
 router.get("/", getLeaderboard);
 
-/** Team leaderboard */
+/* -------------------------------------------------------------------------- */
+/*                                TEAM LEADERBOARD                             */
+/* -------------------------------------------------------------------------- */
 router.get("/teams", getTeamLeaderboard);
 
-/** Members inside a specific team */
+/* -------------------------------------------------------------------------- */
+/*                        INTERNAL MEMBERS LEADERBOARD                         */
+/* -------------------------------------------------------------------------- */
+/**
+ * MUST be last among routes beginning with `/team/*`
+ * to avoid matching `/team/anything` unintentionally.
+ */
 router.get("/team/:id", getTeamMembersLeaderboard);
 
 export default router;

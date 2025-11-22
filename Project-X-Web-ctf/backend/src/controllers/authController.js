@@ -3,12 +3,12 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import prisma from "../config/db.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS || 12);
 
 /* ---------------------------------------------------------
-   Helper: Generate JWT Token (clean + consistent)
+   Helper: Generate JWT Token
 --------------------------------------------------------- */
 function generateToken(user) {
   return jwt.sign(
@@ -30,15 +30,14 @@ export async function register(req, res) {
     console.log("📩 REGISTER:", req.body);
 
     const { username, password, email } = req.body || {};
+    const isProd = process.env.NODE_ENV === "production";
 
-    if (!username || !password) {
+    if (!username || !password)
       return res.status(400).json({ error: "Username and password required" });
-    }
 
     const existing = await prisma.user.findUnique({ where: { username } });
-    if (existing) {
+    if (existing)
       return res.status(409).json({ error: "Username already exists" });
-    }
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
@@ -48,9 +47,26 @@ export async function register(req, res) {
 
     const token = generateToken(user);
 
+    // API token (secure, httpOnly)
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    // WS Token (readable by frontend)
+    res.cookie("wsToken", token, {
+      httpOnly: false,
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
     return res.json({
       message: "Registration successful",
-      token,
       user: {
         id: user.id,
         username: user.username,
@@ -65,17 +81,17 @@ export async function register(req, res) {
 }
 
 /* ---------------------------------------------------------
-   LOGIN USER (Bearer Token Only)
+   LOGIN USER (Cookie-based Auth + WebSocket token)
 --------------------------------------------------------- */
 export async function login(req, res) {
   try {
     console.log("🔐 LOGIN:", req.body);
 
     const { username, password } = req.body || {};
+    const isProd = process.env.NODE_ENV === "production";
 
-    if (!username || !password) {
+    if (!username || !password)
       return res.status(400).json({ error: "Username and password required" });
-    }
 
     const user = await prisma.user.findUnique({
       where: { username },
@@ -88,20 +104,37 @@ export async function login(req, res) {
       },
     });
 
-    if (!user) {
+    if (!user)
       return res.status(401).json({ error: "Invalid username or password" });
-    }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
+    if (!valid)
       return res.status(401).json({ error: "Invalid username or password" });
-    }
 
     const token = generateToken(user);
 
+    // API token (secure, httpOnly)
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
+      partitioned: isProd,
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    // WS Token (readable by frontend)
+    res.cookie("wsToken", token, {
+      httpOnly: false,
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
+      partitioned: true,
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
     return res.json({
       message: "Login successful",
-      token,
       user: {
         id: user.id,
         username: user.username,
@@ -116,10 +149,26 @@ export async function login(req, res) {
 }
 
 /* ---------------------------------------------------------
-   LOGOUT (NOT USED IN BEARER VERSION, RETURN MESSAGE ONLY)
+   LOGOUT (clears both cookies)
 --------------------------------------------------------- */
 export function logout(req, res) {
-  return res.json({ message: "Logged out (remove token on client side)" });
+  const isProd = process.env.NODE_ENV === "production";
+
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+    path: "/",
+  });
+
+  res.clearCookie("wsToken", {
+    httpOnly: false,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+    path: "/",
+  });
+
+  return res.json({ message: "Logged out successfully" });
 }
 
 /* ---------------------------------------------------------
@@ -127,9 +176,8 @@ export function logout(req, res) {
 --------------------------------------------------------- */
 export async function me(req, res) {
   try {
-    if (!req.user?.id) {
+    if (!req.user?.id)
       return res.status(401).json({ error: "Not authenticated" });
-    }
 
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
@@ -149,9 +197,7 @@ export async function me(req, res) {
       },
     });
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     return res.json({
       user: {

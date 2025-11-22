@@ -1,6 +1,6 @@
 /**
- * Challenge Routes (ESM + Optimized)
- * ----------------------------------
+ * Challenge Routes (ESM + Optimized + Cookie Safe)
+ * ------------------------------------------------
  */
 
 import express from "express";
@@ -20,36 +20,40 @@ import {
 const router = express.Router();
 
 /* ============================================================
-   PUBLIC ROUTES (no auth)
+   PUBLIC ROUTES
    ============================================================ */
 
-/** Public challenge list (released only) */
+/** Public released challenges */
 router.get("/public", getPublicChallenges);
 
-/** All challenges (metadata only) — public by your current design */
+/** All challenges (metadata only) */
 router.get("/", getChallenges);
 
-/** Get specific challenge */
-router.get("/:id", getChallengeById);
-
 /* ============================================================
-   PROTECTED ROUTES (instances, lifecycle, private data)
+   AUTH-PROTECTED ROUTES MUST COME BEFORE /:id
    ============================================================ */
 
-/** Require authentication for all below */
 router.use(authenticate);
 
-/** Retrieve user's running instance info */
+/** Challenge instance status */
 router.get("/instance/:id", getChallengeInstance);
 
-/** Spawn a new challenge instance */
+/** Spawn new instance */
 router.post("/spawn/:id", spawnChallengeInstance);
 
-/** Container lifecycle */
+/** Start container (legacy) */
 router.post("/start/:id", startChallenge);
+
+/** Stop container */
 router.post("/stop/:id", stopChallenge);
 
-/** Extend active instance time */
+/** Extend container TTL */
 router.post("/extend/:id", extendInstance);
+
+/* ============================================================
+   PUBLIC GET-BY-ID (must be last to avoid route collisions)
+   ============================================================ */
+
+router.get("/:id", getChallengeById);
 
 export default router;

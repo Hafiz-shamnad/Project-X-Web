@@ -85,12 +85,14 @@ export default function Navbar() {
 
     const loadUser = async () => {
       try {
-        const data = await apiFetch("/auth/me"); // <-- USE API CLIENT
+        const data = await apiFetch("/auth/me"); // returns JSON directly
         if (!active) return;
-        setUser(data.user);
-      } catch (err) {
-        // 401 is already handled by apiFetch (redirects to login)
-        console.error("Auth load error:", err);
+
+        if (data?.user) {
+          setUser(data.user);
+        }
+      } catch {
+        // fail silently
       }
     };
 
@@ -101,10 +103,10 @@ export default function Navbar() {
   }, []);
 
   /* -------------------------------------------------------
-   * Unread Announcements + WebSocket
+   * Unread Announcements + WebSocket Listener
    * ------------------------------------------------------- */
   useEffect(() => {
-    // Load unread count
+    // Step 1 — Load unread announcements count
     fetch(`${BACKEND_URL}/announcement/unread`, {
       credentials: "include",
     })
@@ -112,13 +114,50 @@ export default function Navbar() {
       .then((d) => setUnread(d.unread || 0))
       .catch(() => {});
 
-    // WebSocket listener
+    /* -------------------------------------------------------
+     * Step 2 — Build WS URL
+     * ------------------------------------------------------- */
     const wsUrl = BACKEND_URL.replace(/^http/, "ws") // http → ws
       .replace(/^https/, "wss") // https → wss
-      .replace(/\/api$/, ""); // remove /api only at end
+      .replace(/\/api$/, ""); // remove trailing /api
 
-    const ws = new WebSocket(`${wsUrl}/ws`);
+    /* -------------------------------------------------------
+     * Step 3 — Read wsToken cookie (not httpOnly)
+     * ------------------------------------------------------- */
+    function getCookie(name: string) {
+      return document.cookie
+        .split("; ")
+        .find((row) => row.startsWith(name + "="))
+        ?.split("=")[1];
+    }
 
+    const wsToken = getCookie("wsToken");
+
+    if (!wsToken) {
+      console.warn("❗ WS token missing — WebSocket not connecting.");
+      return;
+    }
+
+    /* -------------------------------------------------------
+     * Step 4 — Connect with token
+     * ------------------------------------------------------- */
+    const ws = new WebSocket(`${wsUrl}/ws?token=${wsToken}`);
+
+    ws.onopen = () => {
+      console.log("🔌 WS connected.");
+    };
+
+    ws.onerror = (err) => {
+      console.error("❌ WS Error:", err);
+    };
+
+    ws.onclose = () => {
+      console.warn("⚠️ WS closed.");
+    };
+
+    /* -------------------------------------------------------
+     * Step 5 — Handle incoming messages
+     * ------------------------------------------------------- */
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -134,7 +173,9 @@ export default function Navbar() {
     return () => ws.close();
   }, []);
 
-  // Reset unread when user opens panel
+  /* -------------------------------------------------------
+   * Reset unread when panel opens
+   * ------------------------------------------------------- */
   useEffect(() => {
     if (openAnnouncements) {
       setUnread(0);
@@ -244,7 +285,13 @@ export default function Navbar() {
             </button>
 
             {openMenu && (
-              <div className="absolute right-0 mt-3 w-60 bg-slate-900/95 border border-blue-500/30 rounded-xl shadow-2xl py-2">
+              <div
+                className="
+                  absolute right-0 mt-3 w-60 bg-slate-900/95 
+                  border border-blue-500/30 rounded-xl shadow-2xl py-2
+                  z-[200000] overflow-visible
+                "
+              >
                 <Link
                   href="/profile"
                   onClick={() => setOpenMenu(false)}
@@ -276,8 +323,8 @@ export default function Navbar() {
 
                 <div className="border-t border-blue-800/40 my-2" />
 
-                <div className="px-3 py-1.5">
-                  <LogoutButton backendURL={BACKEND_URL} />
+                <div className="px-3 py-2">
+                  <LogoutButton />
                 </div>
               </div>
             )}
@@ -307,7 +354,13 @@ export default function Navbar() {
             onClick={() => setOpenMobile(false)}
           />
 
-          <div className="fixed top-[70px] left-0 right-0 bg-slate-900/95 z-50 p-6 border-b border-blue-500/40 shadow-xl">
+          <div
+            className="
+              fixed top-[70px] left-0 right-0 bottom-0 
+              bg-slate-900/95 z-50 p-6 border-b border-blue-500/40 shadow-xl
+              overflow-y-auto
+            "
+          >
             <div className="flex items-center gap-3 mb-5 p-4 rounded-lg bg-blue-900/20 border border-blue-500/20">
               <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-black font-bold">
                 {user ? user.username[0].toUpperCase() : "?"}
@@ -336,7 +389,7 @@ export default function Navbar() {
             </Link>
 
             <div className="pt-3">
-              <LogoutButton backendURL={BACKEND_URL} />
+              <LogoutButton />
             </div>
           </div>
         </>

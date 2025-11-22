@@ -1,7 +1,9 @@
 /**
- * Announcement Routes (ESM + Optimized)
- * -------------------------------------
- * All announcement routes require authentication (Bearer JWT).
+ * Announcement Routes (ESM + Cookie Auth)
+ * ---------------------------------------
+ * All announcement routes require:
+ *   - Valid cookie-based JWT (authenticate)
+ * Admin-only actions are enforced in the controller.
  */
 
 import express from "express";
@@ -16,19 +18,27 @@ import {
 
 const router = express.Router();
 
-// Apply auth to all routes in this module
+/* -------------------------------------------------------------------------- */
+/*                               AUTH MIDDLEWARE                               */
+/* -------------------------------------------------------------------------- */
+
+// All announcement endpoints require authentication
 router.use(authenticate);
 
-// Create announcement
+/* -------------------------------------------------------------------------- */
+/*                                 ANNOUNCEMENTS                               */
+/* -------------------------------------------------------------------------- */
+
+// Admin-only (checked inside controller)
 router.post("/", createAnnouncement);
 
-// Get all announcements for the user
+// Get all announcements available to the authenticated user
 router.get("/", getAnnouncements);
 
-// Get unread announcement count
+// Get unread announcement count for this user
 router.get("/unread", unreadCount);
 
-// Mark single announcement as read
+// Mark an announcement as read
 router.post("/:id/read", markRead);
 
 export default router;

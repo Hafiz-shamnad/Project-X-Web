@@ -15,21 +15,24 @@ import {
 
 const router = express.Router();
 
-/* =====================================================
-   AUTHENTICATED TEAM OPERATIONS
-   ===================================================== */
+/* --------------------------------------------------------------------------
+   AUTHENTICATED TEAM ACTIONS (all routes require auth)
+   -------------------------------------------------------------------------- */
 router.use(authenticate);
 
-/** Get authenticated user's team */
+/** Get the authenticated user's team */
 router.get("/me", getMyTeam);
 
-/** Create a team */
+/** Create a new team */
 router.post("/create", createTeam);
 
-/** Join a team */
+/** Join a team via join code */
 router.post("/join", joinTeam);
 
-/** Get solves of team by ID */
+/* --------------------------------------------------------------------------
+   GET TEAM SOLVES BY ID 
+   (must remain last to avoid matching /me, /create, etc.)
+   -------------------------------------------------------------------------- */
 router.get("/:id/solves", getTeamSolves);
 
 export default router;
