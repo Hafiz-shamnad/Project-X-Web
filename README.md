@@ -1,108 +1,151 @@
-# ⚔️ Project-X CTF Platform
+# ⚔️ Project-X — Open-Source CTF Platform
 
-> **Project-X** is a next-generation cybersecurity and Capture The Flag (CTF) platform built for learners, ethical hackers, and organizations.  
-> Designed to deliver seamless challenge experiences, secure flag validation, and real-time competition — all under a sleek, hacker-themed UI.
+> **Project-X** is an open-source, next-generation Capture The Flag (CTF) and cybersecurity learning platform built for students, ethical hackers, and communities.
+> Designed for smooth challenge delivery, secure flag validation, real-time leaderboards, and a sleek hacker-themed interface — all under the **GNU GPL License**.
 
 ---
 
-![Project-X Banner](https://via.placeholder.com/1200x300?text=Project-X+CTF+Platform)
+![Project-X Banner](./assets/banner.png)
 
 ---
 
 ## 🧠 Overview
 
-**Project-X** provides an end-to-end platform for hosting cybersecurity challenges, managing participants, and tracking performance through an interactive web interface.  
-It’s built for universities, hackathons, and hacker communities who want a robust and scalable CTF experience.
+**Project-X** is an end-to-end platform that powers cybersecurity competitions, training labs, and community challenges.
 
-With **role-based authentication**, **dynamic scoring**, and **real-time leaderboards**, Project-X transforms how cybersecurity competitions are organized and experienced.
+Built with a modular architecture, Project-X offers:
+
+* Role-based authentication
+* Dynamic scoring
+* Real-time leaderboards
+* Multi-category challenges
+* Team collaboration
+* Dockerized deployment
+
+Perfect for universities, hackathons, student clubs, training centers, and cybersecurity communities.
 
 ---
 
 ## 🧩 Core Features
 
-✅ **User Authentication & Role Management**  
-- Secure JWT-based login/register system  
-- Role-based access control (Admin / Player)
+### 🔐 **User Authentication & Access Control**
 
-🏁 **Challenge Management System**  
-- Add, update, and delete CTF challenges  
-- Categorization by difficulty and domain (Web, Crypto, Pwn, etc.)
+* JWT-based login / registration
+* Role-based permissions (Admin / Player)
 
-🚩 **Flag Validation Engine**  
-- Secure backend verification  
-- Prevents brute-force & replay attacks  
-- Dynamic scoring mechanism
+### 🧠 **Challenge Management**
 
-🏆 **Leaderboard System**  
-- Real-time rank updates  
-- Individual and team-based scores  
+* Add, update, delete CTF challenges
+* Category & difficulty tagging
+* Web, Forensics, Crypto, Pwn, OSINT, Misc
 
-💬 **Team Collaboration**  
-- Team dashboard  
-- Invite members and collaborate on challenges
+### 🚩 **Secure Flag Validation Engine**
 
-🛡️ **Protected Routes with Middleware**  
-- Dashboard and challenge routes accessible only to authenticated users  
+* Backend-only validation
+* Anti-bruteforce protection
+* Dynamic or static scoring options
 
-⚡ **Optimized Performance**  
-- Lazy loading, caching, and database optimization  
-- Docker-ready setup for deployment
+### 🏆 **Leaderboard System**
+
+* Real-time ranking
+* Individual + Team-based scores
+
+### 👥 **Team Collaboration**
+
+* Create or join teams
+* Team dashboard & statistics
+
+### 🛡️ **Protected Routes via Middleware**
+
+* Dashboard & challenge pages require auth
+
+### 🐳 **Docker & Docker Compose Support**
+
+* One-command setup
+* Automatic PostgreSQL + Prisma migration
+* Frontend + Backend + DB fully containerized
 
 ---
 
 ## 🏗️ Tech Stack
 
-| Layer | Technology |
-|-------|-------------|
-| **Frontend** | Next.js + Tailwind CSS + TypeScript |
-| **Backend** | Node.js (API Routes or Express) |
-| **ORM** | Prisma |
-| **Database** | PostgreSQL |
-| **Auth** | JWT + Secure Middleware |
-| **Containerization** | Docker & Docker Compose |
-| **Deployment** | Vercel / Render / Railway / Local |
+| Layer                | Technology                          |
+| -------------------- | ----------------------------------- |
+| **Frontend**         | Next.js + Tailwind CSS + TypeScript |
+| **Backend**          | Node.js (API Routes / Express)      |
+| **Authentication**   | JWT + Secure Middleware             |
+| **Database**         | PostgreSQL                          |
+| **ORM**              | Prisma                              |
+| **Containerization** | Docker + Docker Compose             |
+| **Deployment**       | Vercel / Render / Railway / Local   |
 
 ---
 
 ## 📁 Project Structure
 
 ```
-
 Project-X/
 │
-├── frontend/                   # Next.js + Tailwind frontend
+├── frontend/                   # Next.js + Tailwind UI
 │   ├── components/             # UI components
-│   ├── app/ or pages/          # Routes and views
-│   ├── middleware.ts           # Auth guard for routes
-│   ├── lib/                    # Helper utilities
+│   ├── app/                    # Routes and views
+│   ├── middleware.ts           # Auth guard
 │   └── ...
 │
-├── backend/                    # Node.js or API logic
+├── backend/                    # Node.js / API logic
 │   ├── prisma/                 # Prisma schema & migrations
 │   ├── src/
-│   │   ├── routes/             # Auth, Challenges, Flags
-│   │   ├── middleware/         # Authentication checks
-│   │   └── utils/
+│   │   ├── routes/             # Auth, Challenge, Flag
+│   │   ├── middleware/         # Auth checks
+│   │   └── utils/              # Helpers
 │   └── ...
 │
-├── docker-compose.yml          # Container setup
-├── .env.example                # Environment template
-├── prisma.schema               # Database schema
+├── docker-compose.yml          # Full Docker stack
+├── .env.example                # Environment variables
 ├── package.json
 └── README.md
+```
 
-````
+---
 
-## ⚙️ Setup Instructions
+# ⚙️ Setup Instructions
 
-### 🧩 1. Clone the Repository
+## 🧩 1. Clone the Repository
 
 ```bash
 git clone https://github.com/yourusername/project-x.git
 cd project-x
-````
+```
 
-### 🔧 2. Install Dependencies
+---
+
+# 🐳 **Docker Setup (Recommended)**
+
+> This method runs the entire platform in containers:
+> **Frontend + Backend + PostgreSQL + Prisma Migrations**
+
+### ▶️ Start Everything
+
+```bash
+docker-compose up --build
+```
+
+### 🛑 Stop Everything
+
+```bash
+docker-compose down
+```
+
+After build completes, access:
+
+👉 **Frontend:** [http://localhost:3000](http://localhost:3000)
+👉 **Backend API:** [http://localhost:8000](http://localhost:8000)
+
+---
+
+# 🧩 Manual Setup (Without Docker)
+
+## 🔧 2. Install Dependencies
 
 ```bash
 npm install
@@ -110,36 +153,30 @@ npm install
 yarn install
 ```
 
-### ⚙️ 3. Configure Environment Variables
+## ⚙️ 3. Configure Environment Variables
 
-Duplicate `.env.example` and rename it to `.env`.
-Fill in your database and secret values:
+Duplicate `.env.example` → `.env` and fill in:
 
 ```bash
 DATABASE_URL="postgresql://username:password@localhost:5432/projectx"
 JWT_SECRET="your_super_secret_key"
 ```
 
-### 🗄️ 4. Set Up the Database
-
-Make sure PostgreSQL is running, then:
+## 🗄️ 4. Database Initialization
 
 ```bash
 npx prisma migrate dev --name init
 ```
 
-### 🚀 5. Run the Development Server
+## 🚀 5. Run the Development Server
 
 ```bash
 npm run dev
 ```
 
-Now open your browser at:
-👉 [http://localhost:3000](http://localhost:3000)
-
 ---
 
-## 🧱 Example Middleware (Authentication Guard)
+# 🔐 Example Middleware (Auth Guard)
 
 ```ts
 // middleware.ts
@@ -150,14 +187,14 @@ export function middleware(req: NextRequest) {
   const token = req.cookies.get('token')?.value;
   const { pathname } = req.nextUrl;
 
-  const isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/ctf');
-  const isAuthRoute = ['/login', '/register', '/'].includes(pathname);
+  const isProtected = pathname.startsWith('/dashboard') || pathname.startsWith('/ctf');
+  const isAuthPage = ['/login', '/register', '/'].includes(pathname);
 
-  if (isProtectedRoute && !token) {
+  if (isProtected && !token) {
     return NextResponse.redirect(new URL('/login', req.url));
   }
 
-  if (isAuthRoute && token) {
+  if (isAuthPage && token) {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 
@@ -165,68 +202,50 @@ export function middleware(req: NextRequest) {
 }
 ```
 
-This ensures:
+---
 
-* 🔒 Authenticated users can access `/dashboard` and `/ctf`
-* 🚫 Unauthenticated users are redirected to `/login`
-* 🏠 Logged-in users can’t revisit `/login` or `/register`
+# 🧩 API Endpoints
+
+| Method | Endpoint             | Description              |
+| ------ | -------------------- | ------------------------ |
+| `POST` | `/api/auth/register` | Register user            |
+| `POST` | `/api/auth/login`    | Login & token generation |
+| `GET`  | `/api/challenges`    | Fetch all challenges     |
+| `POST` | `/api/flag/submit`   | Validate challenge flag  |
+| `GET`  | `/api/leaderboard`   | Real-time leaderboard    |
 
 ---
 
-## 🐳 Docker Setup (Optional)
+# 🧠 Future Enhancements
 
-To run everything in containers:
-
-```bash
-docker-compose up --build
-```
-
-This spins up:
-
-* PostgreSQL database
-* Next.js frontend/backend
-* Prisma migrations automatically
+* 🤖 AI-powered challenge recommendations
+* 🌍 Multi-language UI support
+* 🔔 Real-time notifications & chat
+* 📊 Admin analytics dashboard
+* 🧑‍💻 Integrated code sandbox
+* 🧵 Support for event-mode CTFs (Jeopardy/Attack-Defense)
 
 ---
 
-## 🧩 API Endpoints (Sample)
+# 🧾 License
 
-| Method | Endpoint             | Description                 |
-| ------ | -------------------- | --------------------------- |
-| `POST` | `/api/auth/register` | Register a new user         |
-| `POST` | `/api/auth/login`    | Authenticate user           |
-| `GET`  | `/api/challenges`    | Get all CTF challenges      |
-| `POST` | `/api/flag/submit`   | Validate submitted flag     |
-| `GET`  | `/api/leaderboard`   | Retrieve global leaderboard |
+**Project-X is open-source under the GNU General Public License (GPL).**
 
----
+✔️ Free to use
+✔️ Free to modify
+✔️ Free to distribute
+✔️ Must remain open-source
 
-## 🧠 Future Enhancements
-
-* 🤖 AI-based challenge recommendations
-* 🌍 Multi-language support
-* 🔔 Real-time notifications and chat
-* 🧮 Analytics dashboard for admins
-* 🧑‍💻 Integrated code sandbox for challenges
+For full legal text, see: **LICENSE** file.
 
 ---
 
-
-🧾 License
-
-This project is proprietary and closed-source.
-All rights are reserved by the author.
-You are not permitted to copy, modify, distribute, or use any part of this software without explicit written permission.
-
-Unauthorized use, reproduction, or redistribution of this software — in full or in part — is strictly prohibited.
-
-## 💬 Contact
+# 💬 Contact
 
 **Author:** Hafiz Shamnad
-
-**LinkedIn:** [linkedin.com/in/hafiz-shamnad](https://linkedin.com/in/hafiz-shamnad)
+**LinkedIn:** [https://linkedin.com/in/hafiz-shamnad](https://linkedin.com/in/hafiz-shamnad)
 
 ---
 
-> 🧠 *"Hack. Learn. Grow. — Project-X is where cybersecurity meets creativity."*
+> 🧠 **"Hack. Learn. Grow. — Project-X empowers the next generation of cybersecurity talent."**
 
