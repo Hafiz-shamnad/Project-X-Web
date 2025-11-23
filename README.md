@@ -5,7 +5,7 @@
 
 ---
 
-![Project-X Banner](./assets/banner.png)
+![Project-X Banner](20251123_1145_Cybersecurity X Logo_simple_compose_01kaqnkhd3em1r09j68a03kjt0.png)
 
 ---
 
